@@ -4,3 +4,4 @@ en_core_sci_md
 tensorflow~=2.5.0rc1
 spacy~=3.0.5
 numpy~=1.19.4
+allennlp~=2.4.0

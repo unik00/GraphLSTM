@@ -1,3 +1,15 @@
+import en_core_sci_md
+
+
+nlp = en_core_sci_md.load()
+print("Finished loading en_core_sci_md")
+
+
+def gen_dependency_tree(sent):
+    doc = nlp(sent)
+    return doc
+
+
 def get_universal_POS():
     universal_pos = ["ADJ",
                      "ADP",
@@ -24,3 +36,7 @@ def get_universal_POS():
 
     return POS_map
 
+
+if __name__ == "__main__":
+    s = "A bilateral retrobulbar neuropathy with an unusual central bitemporal hemianopic scotoma was found"
+    print(get_POSs(s))
