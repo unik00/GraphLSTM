@@ -5,21 +5,23 @@ import tensorflow as tf
 from allennlp.modules.elmo import batch_to_ids, Elmo
 from tensorflow.keras.layers import *
 
+from cdr_data import CDRData
 from emb_utils import *
 
 
 class CNNCharEmbedding(Layer):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    PADDED_LENGTH = 20
+    CONV_SIZE = 3
+    NUM_FILTERS = 20
+    CHAR_DIM = 4
+
+    def __init__(self, char_dict):
+        super().__init__(char_dict)
         # TODO: keras Hyperband tuner
-        self.VOCAB_SIZE = 100
 
-        self.PADDED_LENGTH = 20
-        self.CONV_SIZE = 3
-        self.NUM_FILTERS = 20
-        self.CHAR_DIM = 4
+        self.char_dict = char_dict
 
-        self.chars_emb = Embedding(self.VOCAB_SIZE, self.CHAR_DIM, input_length=self.PADDED_LENGTH)
+        self.chars_emb = Embedding(len(self.char_dict), self.CHAR_DIM, input_length=self.PADDED_LENGTH)
         self.conv = Conv2D(kernel_size=(self.CONV_SIZE, self.CHAR_DIM),
                            strides=(1, self.CHAR_DIM),
                            filters=self.NUM_FILTERS)
@@ -48,16 +50,14 @@ class POSEmbedding(Layer):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.POS_MAP = get_universal_POS()
-        self.NUM_TYPE = len(self.POS_MAP)
+        self.pos_map = get_universal_POS()
 
         self.EMB_DIM = 10
 
-        self.POS_emb = Embedding(self.NUM_TYPE, self.EMB_DIM, input_length=1)
-        # is input_length always 1?
+        self.POS_emb = Embedding(len(self.pos_map), self.EMB_DIM, input_length=1)
 
     def call(self, list_POSs: List[str]):
-        mapped_inputs = tf.convert_to_tensor([self.POS_MAP[POS] for POS in list_POSs])
+        mapped_inputs = tf.convert_to_tensor([self.pos_map[POS] for POS in list_POSs])
         print("mapped inputs: ", mapped_inputs)
         return self.POS_emb(mapped_inputs)
 
@@ -81,11 +81,12 @@ class ELMoEmbedding(Layer):
 
 
 class GraphLSTM(tf.keras.Model):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, dataset):
+        super().__init__()
 
         # embeddings
-        self.char_emb = CNNCharEmbedding()
+        self.dataset = dataset
+        self.char_emb = CNNCharEmbedding(self.dataset.char_dict)
         self.elmo_emb = ELMoEmbedding()
         self.pos_emb = POSEmbedding()
 
@@ -110,12 +111,12 @@ class GraphLSTM(tf.keras.Model):
         print(ps.shape)
 
     def call(self, inputs):
-
         pass
 
 
 if __name__ == "__main__":
-    char_emb = CNNCharEmbedding()
+    data = CDRData()
+    char_emb = CNNCharEmbedding(data.char_dict)
     x = np.random.randint(100, size=(2, 20))
     print(x)
     print("char emb x shape: ", char_emb(x).shape)
