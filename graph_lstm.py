@@ -176,57 +176,62 @@ class CustomizeLSTMCell(tf.keras.layers.Layer):
         super(CustomizeLSTMCell, self).__init__()
         self.have_built_weight = False
 
-    def call(self, s_in, s_out, h_in, h_out, last_c):
+    def call(self, inputs):
+        s_in, s_out, h_in, h_out, last_c = inputs
         #         s_in a*1
         #         s_out a*1
         #         h_in b*1
         #         h_out b*1
         #         last_c b*1
         if not self.have_built_weight:
-            number_units_h = tf.size(h_in)
-            number_units_s = tf.size(s_in)
+            number_of_token = h_in.shape[1]
+            number_units_h = h_in.shape[2]
+            number_units_s = s_in.shape[2]
             self.w_in_input = self.add_weight('w_in_input',
-                                              shape=[number_units_h, number_units_s])
+                                              shape=[number_units_h, number_units_s], dtype=tf.float32)
             self.w_out_input = self.add_weight('w_out_input',
-                                               shape=[number_units_h, number_units_s])
+                                               shape=[number_units_h, number_units_s], dtype=tf.float32)
             self.u_in_input = self.add_weight('u_in_input',
-                                              shape=[number_units_h, number_units_h])
+                                              shape=[number_units_h, number_units_h], dtype=tf.float32)
             self.u_out_input = self.add_weight('u_out_input',
-                                               shape=[number_units_h, number_units_h])
+                                               shape=[number_units_h, number_units_h], dtype=tf.float32)
             self.b_input = self.add_weight('b_input',
-                                           shape=[number_units_h, ])
+                                           shape=[number_units_h, ], dtype=tf.float32)
             self.w_in_output = self.add_weight('w_in_output',
-                                               shape=[number_units_h, number_units_s])
+                                               shape=[number_units_h, number_units_s], dtype=tf.float32)
             self.w_out_output = self.add_weight('w_out_output',
-                                                shape=[number_units_h, number_units_s])
+                                                shape=[number_units_h, number_units_s], dtype=tf.float32)
             self.u_in_output = self.add_weight('u_in_output',
-                                               shape=[number_units_h, number_units_h])
+                                               shape=[number_units_h, number_units_h], dtype=tf.float32)
             self.u_out_output = self.add_weight('u_out_output',
-                                                shape=[number_units_h, number_units_h])
+                                                shape=[number_units_h, number_units_h], dtype=tf.float32)
             self.b_output = self.add_weight('b_output',
-                                            shape=[number_units_h, ])
+                                            shape=[number_units_h, ], dtype=tf.float32)
             self.w_in_forget = self.add_weight('w_in_forget',
-                                               shape=[number_units_h, number_units_s])
+                                               shape=[number_units_h, number_units_s], dtype=tf.float32)
             self.w_out_forget = self.add_weight('w_out_forget',
-                                                shape=[number_units_h, number_units_s])
+                                                shape=[number_units_h, number_units_s], dtype=tf.float32)
             self.u_in_forget = self.add_weight('u_in_forget',
-                                               shape=[number_units_h, number_units_h])
+                                               shape=[number_units_h, number_units_h], dtype=tf.float32)
             self.u_out_forget = self.add_weight('u_out_forget',
-                                                shape=[number_units_h, number_units_h])
+                                                shape=[number_units_h, number_units_h], dtype=tf.float32)
             self.b_forget = self.add_weight('b',
-                                            shape=[number_units_h, ])
+                                            shape=[number_units_h, ], dtype=tf.float32)
             self.w_in_update = self.add_weight('w_in_update',
-                                               shape=[number_units_h, number_units_s])
+                                               shape=[number_units_h, number_units_s], dtype=tf.float32)
             self.w_out_update = self.add_weight('w_out_update',
-                                                shape=[number_units_h, number_units_s])
+                                                shape=[number_units_h, number_units_s], dtype=tf.float32)
             self.u_in_update = self.add_weight('u_in_update',
-                                               shape=[number_units_h, number_units_h])
+                                               shape=[number_units_h, number_units_h], dtype=tf.float32)
             self.u_out_update = self.add_weight('u_out_update',
-                                                shape=[number_units_h, number_units_h])
+                                                shape=[number_units_h, number_units_h], dtype=tf.float32)
             self.b_update = self.add_weight('b_update',
-                                            shape=[number_units_h, ])
+                                            shape=[number_units_h, ], dtype=tf.float32)
             self.have_built_weight = True
-
+        assert number_of_token == h_out.shape[1]
+        assert number_of_token == s_in.shape[1]
+        assert number_of_token == s_out.shape[1]
+        assert number_of_token == last_c.shape[1]
         input_gate = tf.sigmoid(tf.math.add_n((tf.matmul(self.w_in_input, s_in),
                                                tf.matmul(self.w_out_input, s_out),
                                                tf.matmul(self.u_in_input, h_in),
@@ -245,8 +250,9 @@ class CustomizeLSTMCell(tf.keras.layers.Layer):
                                                 tf.matmul(self.u_out_input, h_out))))
         cell_state = tf.add(tf.multiply(forget_gate, last_c), tf.multiply(update_gate, input_gate))
         hidden_state = tf.multiply(output_gate, cell_state)
-        return {'cell_state': cell_state,
-                'hidden_state': hidden_state}
+        cell_state = tf.reshape(cell_state, (-1, 1, number_of_token, number_units_h))
+        hidden_state = tf.reshape(hidden_state, (-1, 1, number_of_token, number_units_h))
+        return tf.concat((cell_state, hidden_state), axis=1)
 
 if __name__ == "__main__":
     s = "A bilateral retrobulbar neuropathy with an unusual central bitemporal hemianopic scotoma was found"
