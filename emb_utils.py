@@ -39,4 +39,3 @@ def get_universal_POS():
 
 if __name__ == "__main__":
     s = "A bilateral retrobulbar neuropathy with an unusual central bitemporal hemianopic scotoma was found"
-    print(get_POSs(s))

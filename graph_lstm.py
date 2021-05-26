@@ -66,7 +66,7 @@ class CNNCharEmbedding(Layer):
         x = tf.reshape(x, [-1, self.PADDED_LENGTH, self.CHAR_DIM, 1])
         x = self.conv(x)
         x = self.max_pool(x)
-        x = tf.reshape(x, [-1, 1, self.NUM_FILTERS])
+        x = tf.reshape(x, [-1, self.NUM_FILTERS])
         return x
 
 
@@ -104,10 +104,12 @@ class ELMoEmbedding(Layer):
         """
         input_tensor = batch_to_ids(inputs)
         # what's the mask is there in the dict for?
-        return tf.convert_to_tensor(self.ELMoEmbedding(input_tensor)["elmo_representations"][0].tolist())
+        return tf.convert_to_tensor(self.ELMoEmbedding(input_tensor)["elmo_representations"][0][0].tolist())
 
 
 class GraphLSTM(tf.keras.Model):
+    BI_LSTM_PHASE_1_OUTPUT_DIM = 30
+
     def __init__(self, dataset):
         super().__init__()
 
@@ -117,10 +119,18 @@ class GraphLSTM(tf.keras.Model):
         self.elmo_emb = ELMoEmbedding()
         self.pos_emb = POSEmbedding()
 
+        # first BiLSTM phase
+        self.biLSTM_1 = Bidirectional(LSTM(self.BI_LSTM_PHASE_1_OUTPUT_DIM,
+                                           return_sequences=True,
+                                           return_state=False))
+
     def emb_single(self, sentence: str):
         """ Returns embedding for one sentence
         Args:
             sentence: one tokenized sentence, containing one sentence only
+        Returns:
+            one tensor of shape [batch_size, d1 + d2 + d3]
+            d1, d2, d3 are shape of 3 types of embeddings
         """
         # get token id from vocab
         doc = gen_dependency_tree(sentence)
@@ -137,9 +147,28 @@ class GraphLSTM(tf.keras.Model):
         print(es.shape)
         print(cs.shape)
         print(ps.shape)
+        concatenated = tf.concat([es, cs, ps], 1)
+        print(concatenated.shape)
 
-    def call(self, inputs):
-        pass
+        return concatenated
+
+    def call(self, input):
+        """
+        Args:
+            input: a single string. TODO (after finish): infer by batch
+        """
+        # TODO: padding before inference?
+        output = self.emb_single(input)  # embedding layer
+
+        output = tf.expand_dims(output, axis=0)
+
+        output = self.biLSTM_1(output)
+        print("output: ", output)
+        print("output.shape: ", output.shape)
+
+        # TODO: graph LSTM
+
+        return output
 
 
 if __name__ == "__main__":
@@ -155,6 +184,6 @@ if __name__ == "__main__":
     # pos_emb = POSEmbedding()
     # print(pos_emb(s).shape)
     model = GraphLSTM(data)
-    model.emb_single(s)
-
+    # model.emb_single(s)
+    model(s)
     pass
