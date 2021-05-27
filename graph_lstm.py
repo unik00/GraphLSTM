@@ -6,6 +6,7 @@ from tensorflow.keras.layers import *
 
 from cdr_data import CDRData, normalize
 from emb_utils import *
+from graph_lstm_utils import AdjMatrixBuilder
 
 
 class CNNCharEmbedding(Layer):
@@ -73,12 +74,11 @@ class CNNCharEmbedding(Layer):
 class POSEmbedding(Layer):
     """The POS embedding are initialized randomly with a EMB_DIM dimensional vector.
     """
+    EMB_DIM = 10
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.pos_map = get_universal_POS()
-
-        self.EMB_DIM = 10
 
         self.POS_emb = Embedding(len(self.pos_map), self.EMB_DIM, input_length=1)
 
@@ -89,6 +89,8 @@ class POSEmbedding(Layer):
 
 
 class ELMoEmbedding(Layer):
+    OUTPUT_DIM = 1024
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -109,6 +111,7 @@ class ELMoEmbedding(Layer):
 
 class GraphLSTM(tf.keras.Model):
     BI_LSTM_PHASE_1_OUTPUT_DIM = 30
+    DEP_EMB_DIM = 10
 
     def __init__(self, dataset):
         super().__init__()
@@ -124,16 +127,21 @@ class GraphLSTM(tf.keras.Model):
                                            return_sequences=True,
                                            return_state=False))
 
-    def emb_single(self, sentence: str):
+        self.graph_builder = AdjMatrixBuilder()
+        self.dep_emb = Embedding(self.graph_builder.num_edge_type, self.DEP_EMB_DIM, input_length=1)
+        self.dep_tanh = Dense(self.DEP_EMB_DIM +
+                              self.BI_LSTM_PHASE_1_OUTPUT_DIM * 2,
+                              activation='tanh')
+
+    def emb_single(self, doc):
         """ Returns embedding for one sentence
         Args:
-            sentence: one tokenized sentence, containing one sentence only
+            doc: one tokenized spacy doc
         Returns:
             one tensor of shape [batch_size, d1 + d2 + d3]
             d1, d2, d3 are shape of 3 types of embeddings
         """
         # get token id from vocab
-        doc = gen_dependency_tree(sentence)
         tokens = [token.text for token in doc]
 
         # get POS
@@ -142,13 +150,8 @@ class GraphLSTM(tf.keras.Model):
         # concatenate embeddings
         ps = self.pos_emb(list_POSs)
         es = self.char_emb(tokens)
-        print(tokens)
         cs = self.elmo_emb(list([tokens]))
-        print(es.shape)
-        print(cs.shape)
-        print(ps.shape)
         concatenated = tf.concat([es, cs, ps], 1)
-        print(concatenated.shape)
 
         return concatenated
 
@@ -158,17 +161,47 @@ class GraphLSTM(tf.keras.Model):
             input: a single string. TODO (after finish): infer by batch
         """
         # TODO: padding before inference?
-        output = self.emb_single(input)  # embedding layer
+        doc = gen_dependency_tree(input)
 
-        output = tf.expand_dims(output, axis=0)
+        emb = self.emb_single(doc)  # embedding layer
 
-        output = self.biLSTM_1(output)
-        print("output: ", output)
-        print("output.shape: ", output.shape)
+        emb = tf.expand_dims(emb, axis=0)
 
-        # TODO: graph LSTM
+        emb = self.biLSTM_1(emb)
 
-        return output
+        print("emb: ", emb)
+        print("emb.shape: ", emb.shape)
+
+        matrix = self.graph_builder(doc)
+        print(matrix)
+        s_in = [0] * len(doc)
+        s_out = [0] * len(doc)
+
+        for i in range(len(doc)):
+            for j in range(len(doc)):
+                e_l = matrix[i][j]
+                if e_l == 0:
+                    continue
+
+                dep = self.dep_emb(tf.convert_to_tensor([e_l]))
+                print("dep shape: ", dep.shape)
+
+                concat = tf.concat([dep, tf.expand_dims(emb[0][i], axis=0)], axis=1)
+
+                s_l_i_j = self.dep_tanh(concat)
+
+                print("concat shape: ", concat.shape)
+                print("s_l_i_j shape: ", s_l_i_j.shape)
+                assert concat.shape == s_l_i_j.shape
+
+                s_in[j] = tf.add(s_in[j], s_l_i_j)
+                s_out[i] = tf.add(s_out[i], s_l_i_j)
+
+        # TODO: check whether or not gradient backpropagation is correct
+        print(s_in)
+        print(s_out)
+
+        return emb  # change this later
 
 
 class CustomizeLSTMCell(tf.keras.layers.Layer):
@@ -253,6 +286,7 @@ class CustomizeLSTMCell(tf.keras.layers.Layer):
         cell_state = tf.reshape(cell_state, (-1, 1, number_of_token, number_units_h))
         hidden_state = tf.reshape(hidden_state, (-1, 1, number_of_token, number_units_h))
         return tf.concat((cell_state, hidden_state), axis=1)
+
 
 if __name__ == "__main__":
     s = "A bilateral retrobulbar neuropathy with an unusual central bitemporal hemianopic scotoma was found"

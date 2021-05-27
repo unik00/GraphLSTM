@@ -1,8 +1,13 @@
 import en_core_sci_md
-
+import spacy
 
 nlp = en_core_sci_md.load()
 print("Finished loading en_core_sci_md")
+
+
+def get_all_dep():
+    for label in nlp.get_pipe("parser").labels:
+        print(label)
 
 
 def gen_dependency_tree(sent):
