@@ -241,11 +241,12 @@ class CalculateHLayer(tf.keras.layers.Layer):
         h_out = tf.multiply(out_edge_repr, unweight_adj_matrix)
         h_out = tf.reduce_sum(h_out, axis=(1, 2))
         print(f'h out: {h_out}')
-        return (h_in, h_out)
+        return h_in, h_out
+
 
 class CalculateSLayer(tf.keras.layers.Layer):
-    DEP_EMB_DIM = GraphLSTM.DEP_EMB_DIM
-    BI_LSTM_OUTPUT_DIM = GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM
+    DEP_EMB_DIM = 10
+    BI_LSTM_OUTPUT_DIM = 30
 
     def __init__(self):
         super(CalculateSLayer, self).__init__()
@@ -253,31 +254,81 @@ class CalculateSLayer(tf.keras.layers.Layer):
         self.dep_emb = Embedding(self.graph_builder.num_edge_type, self.DEP_EMB_DIM, input_length=1)
         self.dep_tanh = Dense(self.DEP_EMB_DIM + self.BI_LSTM_OUTPUT_DIM * 2, activation='tanh')
 
-    def call(self, doc, h):
-        #h: BiLSTM Output
+    def call(self, inputs, h):
+        # h: 13*60
+        doc = gen_dependency_tree(inputs)
         leng_doc = len(doc)
+
         matrix = self.graph_builder(doc)
-        unweighted_adj_matrix = self.graph_builder.get_unweighted_matrix(doc)
-        unweighted_adj_matrix = tf.reshape(unweighted_adj_matrix, (leng_doc, leng_doc, 2, 1))
-        unweighted_adj_matrix = tf.broadcast_to(unweighted_adj_matrix,
-                                                (leng_doc,
-                                                 leng_doc,
-                                                 2,
-                                                 self.DEP_EMB_DIM + self.BI_LSTM_OUTPUT_DIM * 2))
-        # matrix: leng_doc * leng_doc * 2
-        # h: leng_doc * bi_lstm_output_dim (outputs of BiLSTM)
-        copy_h = tf.identity(h)
-        edge_emb = self.dep_emb(matrix)
-        h = tf.reshape(h, (leng_doc, 1, 1, self.BI_LSTM_OUTPUT_DIM * 2))
-        h = tf.broadcast_to(h, (leng_doc, leng_doc, 2, self.BI_LSTM_OUTPUT_DIM * 2))
-        # print(h)
-        # print(edge_emb)
-        edge_repr = tf.concat((h, edge_emb), axis=3)
-        tanh_edge_repr = self.dep_tanh(edge_repr)
-        standardized_s = tf.multiply(tanh_edge_repr, unweighted_adj_matrix)
-        s_in = tf.reduce_sum(standardized_s, axis=(1, 2))
-        s_out = tf.reduce_sum(standardized_s, axis=(0, 2))
-        # print(s_in, s_out)
+        # matrix: 13*13*2
+
+        unpreprocessed_unweight_adj_matrix = self.graph_builder.get_unweighted_matrix(doc)
+        # unpreprocessed_unweight_adj_matrix: 13*13*2
+
+        unweight_adj_matrix = tf.reshape(unpreprocessed_unweight_adj_matrix, (leng_doc, leng_doc, 2, 1))
+        unweight_adj_matrix = tf.broadcast_to(unweight_adj_matrix,
+                                              (leng_doc,
+                                               leng_doc,
+                                               2,
+                                               self.DEP_EMB_DIM + self.BI_LSTM_OUTPUT_DIM * 2))
+        # unweight_adj_matrix: 13*13*2*70
+        embedded_matrix = self.dep_emb(matrix)
+        # embedded_matrix: 13*13*2*10
+        node_edge_h = tf.identity(h)
+        node_edge_h = tf.reshape(node_edge_h,
+                                 (len(doc), 1, 1, 2 * self.BI_LSTM_OUTPUT_DIM))
+        node_edge_h = tf.broadcast_to(node_edge_h,
+                                      (len(doc), len(doc), 2, 2 * self.BI_LSTM_OUTPUT_DIM))
+        node_edge_repr = tf.concat((embedded_matrix, node_edge_h), axis=3)
+        node_edge_repr = tf.multiply(unweight_adj_matrix, node_edge_repr)
+        # node_edge_repr: 13*13*2*70
+        node_edge_repr = self.dep_tanh(node_edge_repr)
+        s_in = tf.reduce_sum(node_edge_repr, axis=(0, 2))
+
+        reversed_node_edge_h = tf.identity(h)
+        reversed_node_edge_h = tf.reshape(reversed_node_edge_h,
+                                          (1, len(doc), 1, 2 * self.BI_LSTM_OUTPUT_DIM))
+        reversed_node_edge_h = tf.broadcast_to(reversed_node_edge_h,
+                                               (len(doc), len(doc), 2, 2 * self.BI_LSTM_OUTPUT_DIM))
+        reversed_node_edge_repr = tf.concat((embedded_matrix, reversed_node_edge_h), axis=3)
+        reversed_node_edge_repr = tf.multiply(unweight_adj_matrix, reversed_node_edge_repr)
+        # reversed_node_edge_repr: 13*13*2*70
+        reversed_node_edge_repr = self.dep_tanh(reversed_node_edge_repr)
+        s_out = tf.reduce_sum(reversed_node_edge_repr, axis=(1, 2))
+#         #Test s out
+#         test_s = np.zeros((len(doc), len(doc), 2, 70))
+#         test_s_out = np.zeros((len(doc), 70))
+#         for i in range(len(doc)):
+#             for j in range(len(doc)):
+#                 for k in range(2):
+#                     if unpreprocessed_unweight_adj_matrix[i, j, k] == 0:
+#                         continue
+#                     test_edge_repr = tf.concat((embedded_matrix[i, j, k], h[j]), axis=0)
+#                     test_edge_repr = tf.reshape(test_edge_repr, (1, -1))
+#                     test_edge_repr = self.dep_tanh(test_edge_repr)
+#                     test_s[j, i, k] = test_edge_repr
+#                     test_s_out[i] += test_s[j, i, k]
+#         test_s_out = tf.constant(test_s_out)
+#         print(s_out)
+#         print(test_s_out)
+
+
+#         Test s in
+#         test_s = np.zeros((len(doc), len(doc), 2, 70))
+#         test_s_in = np.zeros((len(doc), 70))
+#         for i in range(len(doc)):
+#             for j in range(len(doc)):
+#                 for k in range(2):
+#                     if unpreprocessed_unweight_adj_matrix[i, j, k] == 0:
+#                         continue
+#                     test_edge_repr = tf.reshape(tf.concat((embedded_matrix[i, j, k], h[i]), axis=(0)), (1, -1))
+#                     test_edge_repr = self.dep_tanh(test_edge_repr)
+#                     test_s[i, j, k] = test_edge_repr
+#                     test_s_in[j] += test_s[i, j, k]
+
+#         test_s_in = tf.constant(test_s_in)
+#         print(test_s_in)
+#         print(s_in)
         return s_in, s_out
 
 
