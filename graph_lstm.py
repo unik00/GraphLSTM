@@ -7,7 +7,7 @@ from tensorflow.keras.layers import *
 from cdr_data import CDRData, normalize
 from emb_utils import *
 from graph_lstm_utils import AdjMatrixBuilder
-
+import numpy as np
 
 class CNNCharEmbedding(Layer):
     PADDED_LENGTH = 20
@@ -84,7 +84,7 @@ class POSEmbedding(Layer):
 
     def call(self, list_POSs: List[str]):
         mapped_inputs = tf.convert_to_tensor([self.pos_map[POS] for POS in list_POSs])
-        print("mapped inputs: ", mapped_inputs)
+        print("POS mapped inputs: ", mapped_inputs)
         return self.POS_emb(mapped_inputs)
 
 
@@ -132,6 +132,7 @@ class GraphLSTM(tf.keras.Model):
         self.dep_tanh = Dense(self.DEP_EMB_DIM +
                               self.BI_LSTM_PHASE_1_OUTPUT_DIM * 2,
                               activation='tanh')
+        self.s_calculator = CalculateSLayer()
 
     def emb_single(self, doc):
         """ Returns embedding for one sentence
@@ -169,39 +170,54 @@ class GraphLSTM(tf.keras.Model):
 
         emb = self.biLSTM_1(emb)
 
-        print("emb: ", emb)
-        print("emb.shape: ", emb.shape)
 
+
+        # print("emb: ", emb)
+        # print("emb.shape: ", emb.shape)
+        bi_lstm_output = tf.identity(emb)
+        bi_lstm_output = tf.reshape(bi_lstm_output, (bi_lstm_output.shape[1], bi_lstm_output.shape[2]))
+        s_in, s_out = self.s_calculator(doc, bi_lstm_output)
+        print(s_in.shape)
+        print(s_out.shape)
+        return 0  # change this later
+
+
+class CalculateSLayer(tf.keras.layers.Layer):
+    DEP_EMB_DIM = 10
+    BI_LSTM_OUTPUT_DIM = 30
+
+    def __init__(self):
+        super(CalculateSLayer, self).__init__()
+        self.graph_builder = AdjMatrixBuilder()
+        self.dep_emb = Embedding(self.graph_builder.num_edge_type, self.DEP_EMB_DIM, input_length=1)
+        self.dep_tanh = Dense(self.DEP_EMB_DIM + self.BI_LSTM_OUTPUT_DIM * 2, activation='tanh')
+
+    def call(self, doc, h):
+        #h: BiLSTM Output
+        leng_doc = len(doc)
         matrix = self.graph_builder(doc)
-        print(matrix)
-        s_in = [0] * len(doc)
-        s_out = [0] * len(doc)
-
-        for i in range(len(doc)):
-            for j in range(len(doc)):
-                e_l = matrix[i][j]
-                if e_l == 0:
-                    continue
-
-                dep = self.dep_emb(tf.convert_to_tensor([e_l]))
-                print("dep shape: ", dep.shape)
-
-                concat = tf.concat([dep, tf.expand_dims(emb[0][i], axis=0)], axis=1)
-
-                s_l_i_j = self.dep_tanh(concat)
-
-                print("concat shape: ", concat.shape)
-                print("s_l_i_j shape: ", s_l_i_j.shape)
-                assert concat.shape == s_l_i_j.shape
-
-                s_in[j] = tf.add(s_in[j], s_l_i_j)
-                s_out[i] = tf.add(s_out[i], s_l_i_j)
-
-        # TODO: check whether or not gradient backpropagation is correct
-        print(s_in)
-        print(s_out)
-
-        return emb  # change this later
+        unweighted_adj_matrix = self.graph_builder.get_unweighted_matrix(doc)
+        unweighted_adj_matrix = tf.reshape(unweighted_adj_matrix, (leng_doc, leng_doc, 2, 1))
+        unweighted_adj_matrix = tf.broadcast_to(unweighted_adj_matrix,
+                                                (leng_doc,
+                                                 leng_doc,
+                                                 2,
+                                                 self.DEP_EMB_DIM + self.BI_LSTM_OUTPUT_DIM * 2))
+        # matrix: leng_doc * leng_doc * 2
+        # h: leng_doc * bi_lstm_output_dim (outputs of BiLSTM)
+        copy_h = tf.identity(h)
+        edge_emb = self.dep_emb(matrix)
+        h = tf.reshape(h, (leng_doc, 1, 1, self.BI_LSTM_OUTPUT_DIM * 2))
+        h = tf.broadcast_to(h, (leng_doc, leng_doc, 2, self.BI_LSTM_OUTPUT_DIM * 2))
+        # print(h)
+        # print(edge_emb)
+        edge_repr = tf.concat((h, edge_emb), axis=3)
+        tanh_edge_repr = self.dep_tanh(edge_repr)
+        standardized_s = tf.multiply(tanh_edge_repr, unweighted_adj_matrix)
+        s_in = tf.reduce_sum(standardized_s, axis=(1, 2))
+        s_out = tf.reduce_sum(standardized_s, axis=(0, 2))
+        # print(s_in, s_out)
+        return s_in, s_out
 
 
 class CustomizeLSTMCell(tf.keras.layers.Layer):
@@ -292,7 +308,7 @@ if __name__ == "__main__":
     s = "A bilateral retrobulbar neuropathy with an unusual central bitemporal hemianopic scotoma was found"
 
     data = CDRData()
-    char_emb = CNNCharEmbedding(data.char_dict)
+    # char_emb = CNNCharEmbedding(data.char_dict)
     # x = np.random.randint(100, size=(2, 20))
     # print(x)
     # print("char emb x shape: ", char_emb(x).shape)
