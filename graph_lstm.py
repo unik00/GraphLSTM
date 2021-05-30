@@ -84,7 +84,7 @@ class POSEmbedding(Layer):
 
     def call(self, list_POSs: List[str]):
         mapped_inputs = tf.convert_to_tensor([self.pos_map[POS] for POS in list_POSs])
-        print("POS mapped inputs: ", mapped_inputs)
+        # print("POS mapped inputs: ", mapped_inputs)
         return self.POS_emb(mapped_inputs)
 
 
@@ -176,7 +176,8 @@ class GraphLSTM(tf.keras.Model):
         s_in, s_out = self.s_calculator(input, bi_lstm_output)
         print(s_in.shape)
         print(s_out.shape)
-        return 0  # change this later
+        print("emb shape: ", emb.shape)
+        return emb  # change this later
 
 
 class CalculateHLayer(Layer):
@@ -369,15 +370,8 @@ if __name__ == "__main__":
     s = "A bilateral retrobulbar neuropathy with an unusual central bitemporal hemianopic scotoma was found"
 
     data = CDRData()
-    # char_emb = CNNCharEmbedding(data.char_dict)
-    # x = np.random.randint(100, size=(2, 20))
-    # print(x)
-    # print("char emb x shape: ", char_emb(x).shape)
-    # elmo_emb = ELMoEmbedding()
-    # print(elmo_emb([s.split(" ")]))
-    # pos_emb = POSEmbedding()
-    # print(pos_emb(s).shape)
+
     model = GraphLSTM(data)
     # model.emb_single(s)
-    model(s)
-    pass
+
+    print(model(s))
