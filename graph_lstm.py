@@ -182,9 +182,70 @@ class GraphLSTM(tf.keras.Model):
         return 0  # change this later
 
 
+class CalculateHLayer(tf.keras.layers.Layer):
+    TRANSISTION_STATE_OUTPUTS_DIM = 150
+
+    def __init__(self):
+        super(CalculateHLayer, self).__init__()
+        self.graph_builder = AdjMatrixBuilder()
+
+    def __call__(self, inputs, h):
+        doc = gen_dependency_tree(inputs)
+        leng_doc = len(doc)
+        unpreprocessed_unweight_adj_matrix = self.graph_builder.get_unweighted_matrix(doc)
+        # h: 13*150
+        # matrix: 13*13*2
+        #         Test h in
+        #         h_in_test = np.zeros((len(doc), self.TRANSISTION_STATE_OUTPUTS_DIM))
+        #         for i in range(len(doc)):
+        #             for j in range(len(doc)):
+        #                 for k in range(2):
+        #                     if unpreprocessed_unweight_adj_matrix[i, j, k] == 0:
+        #                         continue
+        #                     h_in_test[j, :] += h[i, :]
+        #         print(h_in_test)
+        unweight_adj_matrix = tf.reshape(unpreprocessed_unweight_adj_matrix, (len(doc), len(doc), 2, 1))
+        unweight_adj_matrix = tf.broadcast_to(unweight_adj_matrix, (len(doc),
+                                                                    len(doc),
+                                                                    2,
+                                                                    self.TRANSISTION_STATE_OUTPUTS_DIM))
+
+        # matrix: 13*13*2*150
+        in_edge_repr = tf.identity(h)
+        in_edge_repr = tf.reshape(in_edge_repr, (len(doc), 1, 1, self.TRANSISTION_STATE_OUTPUTS_DIM))
+        in_edge_repr = tf.broadcast_to(in_edge_repr, (len(doc),
+                                                      len(doc),
+                                                      2,
+                                                      self.TRANSISTION_STATE_OUTPUTS_DIM))
+        # in_edge_repr: 13*13*2*150 h(i, l)
+        h_in = tf.multiply(in_edge_repr, unweight_adj_matrix)
+        h_in = tf.reduce_sum(h_in, axis=(0, 2))
+        #         print(f'h in:{h_in}')
+
+        #         Test h out
+        #         test_h_out = np.zeros((len(doc), self.TRANSISTION_STATE_OUTPUTS_DIM))
+        #         for i in range(len(doc)):
+        #             for j in range(len(doc)):
+        #                 for k in range(2):
+        #                     if unpreprocessed_unweight_adj_matrix[i, j, k] == 0:
+        #                         continue
+        #                     test_h_out[i, :] += h[j, :]
+        #         print(f'test h out: {test_h_out}')
+
+        out_edge_repr = tf.identity(h)
+        out_edge_repr = tf.reshape(out_edge_repr, (1, len(doc), 1, self.TRANSISTION_STATE_OUTPUTS_DIM))
+        out_edge_repr = tf.broadcast_to(out_edge_repr, (len(doc),
+                                                        len(doc),
+                                                        2, self.TRANSISTION_STATE_OUTPUTS_DIM))
+        # out_edge_repr: 13*13*2*150 h(j, l)
+        h_out = tf.multiply(out_edge_repr, unweight_adj_matrix)
+        h_out = tf.reduce_sum(h_out, axis=(1, 2))
+        print(f'h out: {h_out}')
+        return (h_in, h_out)
+
 class CalculateSLayer(tf.keras.layers.Layer):
-    DEP_EMB_DIM = 10
-    BI_LSTM_OUTPUT_DIM = 30
+    DEP_EMB_DIM = GraphLSTM.DEP_EMB_DIM
+    BI_LSTM_OUTPUT_DIM = GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM
 
     def __init__(self):
         super(CalculateSLayer, self).__init__()
