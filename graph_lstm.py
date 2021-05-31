@@ -1,6 +1,7 @@
 from typing import List
 
 import tensorflow as tf
+import numpy as np
 from allennlp.modules.elmo import batch_to_ids, Elmo
 from tensorflow.keras.layers import *
 
@@ -109,9 +110,186 @@ class ELMoEmbedding(Layer):
         return tf.convert_to_tensor(self.ELMoEmbedding(input_tensor)["elmo_representations"][0][0].tolist())
 
 
+class CalculateHLayer(Layer):
+    TRANSITION_STATE_OUTPUTS_DIM = 150
+
+    def __init__(self):
+        super(CalculateHLayer, self).__init__()
+
+    def call(self, unpreprocessed_unweight_adj_matrix, h):
+        """
+        Args:
+            input: a string denoting one single sentence
+            h: previous hidden state
+        """
+        leng_doc = h.shape[0]
+        # h: 13*150
+        unweight_adj_matrix = tf.reshape(unpreprocessed_unweight_adj_matrix, (leng_doc, leng_doc, 2, 1))
+        unweight_adj_matrix = tf.broadcast_to(unweight_adj_matrix, (leng_doc,
+                                                                    leng_doc,
+                                                                    2,
+                                                                    self.TRANSITION_STATE_OUTPUTS_DIM))
+
+        # matrix: 13*13*2*150
+        in_edge_repr = tf.identity(h)
+        in_edge_repr = tf.reshape(in_edge_repr, (leng_doc, 1, 1, self.TRANSITION_STATE_OUTPUTS_DIM))
+        in_edge_repr = tf.broadcast_to(in_edge_repr, (leng_doc,
+                                                      leng_doc,
+                                                      2,
+                                                      self.TRANSITION_STATE_OUTPUTS_DIM))
+        # in_edge_repr: 13*13*2*150 h(i, l)
+        h_in = tf.multiply(in_edge_repr, unweight_adj_matrix)
+        h_in = tf.reduce_sum(h_in, axis=(0, 2))
+
+        out_edge_repr = tf.identity(h)
+        out_edge_repr = tf.reshape(out_edge_repr, (1, leng_doc, 1, self.TRANSITION_STATE_OUTPUTS_DIM))
+        out_edge_repr = tf.broadcast_to(out_edge_repr, (leng_doc,
+                                                        leng_doc,
+                                                        2, self.TRANSITION_STATE_OUTPUTS_DIM))
+        # out_edge_repr: 13*13*2*150 h(j, l)
+        h_out = tf.multiply(out_edge_repr, unweight_adj_matrix)
+        h_out = tf.reduce_sum(h_out, axis=(1, 2))
+        print(f'h out: {h_out}')
+        return h_in, h_out
+
+
+class CalculateSLayer(Layer):
+    def __init__(self, graph_builder):
+        super(CalculateSLayer, self).__init__()
+        self.graph_builder = graph_builder
+        self.dep_emb = Embedding(self.graph_builder.num_edge_type, GraphLSTM.DEP_EMB_DIM, input_length=1)
+        self.dep_tanh = Dense(GraphLSTM.DEP_EMB_DIM + GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM * 2,
+                              activation='tanh')
+
+    def call(self, matrix, unpreprocessed_unweight_adj_matrix, h):
+        """
+        Args:
+            input: a string denoting one single sentence
+            h: previous hidden state
+        """
+        # h: 13*60
+        leng_doc = matrix.shape[0]
+        # matrix: 13*13*2
+        # unpreprocessed_unweight_adj_matrix: 13*13*2
+
+        unweight_adj_matrix = tf.reshape(unpreprocessed_unweight_adj_matrix, (leng_doc, leng_doc, 2, 1))
+        unweight_adj_matrix = tf.broadcast_to(unweight_adj_matrix,
+                                              (leng_doc,
+                                               leng_doc,
+                                               2,
+                                               GraphLSTM.DEP_EMB_DIM + GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM * 2))
+        # unweight_adj_matrix: 13*13*2*70
+        embedded_matrix = self.dep_emb(matrix)
+        # embedded_matrix: 13*13*2*10
+        node_edge_h = tf.identity(h)
+        node_edge_h = tf.reshape(node_edge_h,
+                                 (leng_doc, 1, 1, 2 * GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM))
+        node_edge_h = tf.broadcast_to(node_edge_h,
+                                      (leng_doc, leng_doc, 2, 2 * GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM))
+        node_edge_repr = tf.concat((embedded_matrix, node_edge_h), axis=3)
+        node_edge_repr = tf.multiply(unweight_adj_matrix, node_edge_repr)
+        # node_edge_repr: 13*13*2*70
+        node_edge_repr = self.dep_tanh(node_edge_repr)
+        s_in = tf.reduce_sum(node_edge_repr, axis=(0, 2))
+
+        reversed_node_edge_h = tf.identity(h)
+        reversed_node_edge_h = tf.reshape(reversed_node_edge_h,
+                                          (1, leng_doc, 1, 2 * GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM))
+
+        reversed_node_edge_h = tf.broadcast_to(reversed_node_edge_h,
+                                               (leng_doc, leng_doc, 2, 2 * GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM))
+
+        reversed_node_edge_repr = tf.concat((embedded_matrix, reversed_node_edge_h), axis=3)
+        reversed_node_edge_repr = tf.multiply(unweight_adj_matrix, reversed_node_edge_repr)
+
+        # reversed_node_edge_repr: 13*13*2*70
+        reversed_node_edge_repr = self.dep_tanh(reversed_node_edge_repr)
+        s_out = tf.reduce_sum(reversed_node_edge_repr, axis=(1, 2))
+
+        return s_in, s_out
+
+
+class CustomizeLSTMCell(Layer):
+    TRANSITION_STATE_OUTPUTS_DIM = 150
+    def __init__(self):
+        super(CustomizeLSTMCell, self).__init__()
+        self.have_built_weight = False
+
+    def call(self, s_in, s_out, h_in, h_out, last_c):
+        number_of_token = h_in.shape[0]
+        number_units_h = h_in.shape[1]
+        number_units_s = s_in.shape[1]
+        if not self.have_built_weight:
+            self.w_in_input = self.add_weight('w_in_input',
+                                              shape=[number_units_s, number_units_h], dtype=tf.float32)
+            self.w_out_input = self.add_weight('w_out_input',
+                                               shape=[number_units_s, number_units_h], dtype=tf.float32)
+            self.u_in_input = self.add_weight('u_in_input',
+                                              shape=[number_units_h, number_units_h], dtype=tf.float32)
+            self.u_out_input = self.add_weight('u_out_input',
+                                               shape=[number_units_h, number_units_h], dtype=tf.float32)
+            self.b_input = self.add_weight('b_input',
+                                           shape=[number_units_h, ], dtype=tf.float32)
+            self.w_in_output = self.add_weight('w_in_output',
+                                               shape=[number_units_s, number_units_h], dtype=tf.float32)
+            self.w_out_output = self.add_weight('w_out_output',
+                                                shape=[number_units_s, number_units_h], dtype=tf.float32)
+            self.u_in_output = self.add_weight('u_in_output',
+                                               shape=[number_units_h, number_units_h], dtype=tf.float32)
+            self.u_out_output = self.add_weight('u_out_output',
+                                                shape=[number_units_h, number_units_h], dtype=tf.float32)
+            self.b_output = self.add_weight('b_output',
+                                            shape=[number_units_h, ], dtype=tf.float32)
+            self.w_in_forget = self.add_weight('w_in_forget',
+                                               shape=[number_units_s, number_units_h], dtype=tf.float32)
+            self.w_out_forget = self.add_weight('w_out_forget',
+                                                shape=[number_units_s, number_units_h], dtype=tf.float32)
+            self.u_in_forget = self.add_weight('u_in_forget',
+                                               shape=[number_units_h, number_units_h], dtype=tf.float32)
+            self.u_out_forget = self.add_weight('u_out_forget',
+                                                shape=[number_units_h, number_units_h], dtype=tf.float32)
+            self.b_forget = self.add_weight('b',
+                                            shape=[number_units_h, ], dtype=tf.float32)
+            self.w_in_update = self.add_weight('w_in_update',
+                                               shape=[number_units_s, number_units_h], dtype=tf.float32)
+            self.w_out_update = self.add_weight('w_out_update',
+                                                shape=[number_units_s, number_units_h], dtype=tf.float32)
+            self.u_in_update = self.add_weight('u_in_update',
+                                               shape=[number_units_h, number_units_h], dtype=tf.float32)
+            self.u_out_update = self.add_weight('u_out_update',
+                                                shape=[number_units_h, number_units_h], dtype=tf.float32)
+            self.b_update = self.add_weight('b_update',
+                                            shape=[number_units_h, ], dtype=tf.float32)
+            self.have_built_weight = True
+        assert number_of_token == h_out.shape[0]
+        assert number_of_token == s_in.shape[0]
+        assert number_of_token == s_out.shape[0]
+        assert number_of_token == last_c.shape[0]
+        input_gate = tf.sigmoid(tf.math.add_n((tf.matmul(s_in, self.w_in_input),
+                                               tf.matmul(s_out, self.w_out_input),
+                                               tf.matmul(h_in, self.u_in_input),
+                                               tf.matmul(h_out, self.u_out_input))))
+        output_gate = tf.sigmoid(tf.math.add_n((tf.matmul(s_in, self.w_in_input),
+                                                tf.matmul(s_out, self.w_out_input),
+                                                tf.matmul(h_in, self.u_in_input),
+                                                tf.matmul(h_out, self.u_out_input))))
+        forget_gate = tf.sigmoid(tf.math.add_n((tf.matmul(s_in, self.w_in_input),
+                                                tf.matmul(s_out, self.w_out_input),
+                                                tf.matmul(h_in, self.u_in_input),
+                                                tf.matmul(h_out, self.u_out_input))))
+        update_gate = tf.sigmoid(tf.math.add_n((tf.matmul(s_in, self.w_in_input),
+                                                tf.matmul(s_out, self.w_out_input),
+                                                tf.matmul(h_in, self.u_in_input),
+                                                tf.matmul(h_out, self.u_out_input))))
+        cell_state = tf.add(tf.multiply(forget_gate, last_c), tf.multiply(update_gate, input_gate))
+        hidden_state = tf.multiply(output_gate, tf.tanh(cell_state))
+        return hidden_state, cell_state
+
+
 class GraphLSTM(tf.keras.Model):
     BI_LSTM_PHASE_1_OUTPUT_DIM = 30
     DEP_EMB_DIM = 10
+    TRANSITION_STEP = 6
 
     def __init__(self, dataset):
         super().__init__()
@@ -134,6 +312,8 @@ class GraphLSTM(tf.keras.Model):
                               activation='tanh')
 
         self.s_calculator = CalculateSLayer(self.graph_builder)
+        self.h_calculator = CalculateHLayer()
+        self.state_transition = CustomizeLSTMCell()
 
     def emb_single(self, doc):
         """ Returns embedding for one sentence
@@ -164,6 +344,8 @@ class GraphLSTM(tf.keras.Model):
         """
         # TODO: padding before inference?
         doc = gen_dependency_tree(input)
+        matrix = self.graph_builder(doc)
+        unpreprocessed_unweight_adj_matrix = self.graph_builder.get_unweighted_matrix(doc)
 
         emb = self.emb_single(doc)  # embedding layer
 
@@ -171,199 +353,23 @@ class GraphLSTM(tf.keras.Model):
 
         emb = self.biLSTM_1(emb)
 
+        print("emb shape: ", emb.shape)
+
         bi_lstm_output = tf.identity(emb)
         bi_lstm_output = tf.reshape(bi_lstm_output, (bi_lstm_output.shape[1], bi_lstm_output.shape[2]))
-        s_in, s_out = self.s_calculator(input, bi_lstm_output)
-        print(s_in.shape)
-        print(s_out.shape)
-        print("emb shape: ", emb.shape)
-        return emb  # change this later
+        s_in, s_out = self.s_calculator(matrix, unpreprocessed_unweight_adj_matrix, bi_lstm_output)
+        initial_h = tf.constant(np.zeros((len(doc), CustomizeLSTMCell.TRANSITION_STATE_OUTPUTS_DIM)), dtype=tf.float32)
+        initial_c = tf.constant(np.zeros((len(doc), CustomizeLSTMCell.TRANSITION_STATE_OUTPUTS_DIM)), dtype=tf.float32)
+        h_history = [initial_h]
+        c_history = [initial_c]
+        for step in range(self.TRANSITION_STEP):
+            h_in, h_out = self.h_calculator(unpreprocessed_unweight_adj_matrix, h_history[-1])
+            h, c = self.state_transition(s_in, s_out, h_in, h_out, c_history[-1])
+            h_history.append(h)
+            c_history.append(c)
 
-
-class CalculateHLayer(Layer):
-    TRANSITION_STATE_OUTPUTS_DIM = 150
-
-    def __init__(self, graph_builder):
-        super(CalculateHLayer, self).__init__()
-        self.graph_builder = graph_builder
-
-    def call(self, input, h):
-        """
-        Args:
-            input: a string denoting one single sentence
-            h: previous hidden state
-        """
-        doc = gen_dependency_tree(input)
-        unpreprocessed_unweight_adj_matrix = self.graph_builder.get_unweighted_matrix(doc)
-        # h: 13*150
-        unweight_adj_matrix = tf.reshape(unpreprocessed_unweight_adj_matrix, (len(doc), len(doc), 2, 1))
-        unweight_adj_matrix = tf.broadcast_to(unweight_adj_matrix, (len(doc),
-                                                                    len(doc),
-                                                                    2,
-                                                                    self.TRANSITION_STATE_OUTPUTS_DIM))
-
-        # matrix: 13*13*2*150
-        in_edge_repr = tf.identity(h)
-        in_edge_repr = tf.reshape(in_edge_repr, (len(doc), 1, 1, self.TRANSITION_STATE_OUTPUTS_DIM))
-        in_edge_repr = tf.broadcast_to(in_edge_repr, (len(doc),
-                                                      len(doc),
-                                                      2,
-                                                      self.TRANSITION_STATE_OUTPUTS_DIM))
-        # in_edge_repr: 13*13*2*150 h(i, l)
-        h_in = tf.multiply(in_edge_repr, unweight_adj_matrix)
-        h_in = tf.reduce_sum(h_in, axis=(0, 2))
-
-        out_edge_repr = tf.identity(h)
-        out_edge_repr = tf.reshape(out_edge_repr, (1, len(doc), 1, self.TRANSITION_STATE_OUTPUTS_DIM))
-        out_edge_repr = tf.broadcast_to(out_edge_repr, (len(doc),
-                                                        len(doc),
-                                                        2, self.TRANSITION_STATE_OUTPUTS_DIM))
-        # out_edge_repr: 13*13*2*150 h(j, l)
-        h_out = tf.multiply(out_edge_repr, unweight_adj_matrix)
-        h_out = tf.reduce_sum(h_out, axis=(1, 2))
-        print(f'h out: {h_out}')
-        return h_in, h_out
-
-
-class CalculateSLayer(Layer):
-    def __init__(self, graph_builder):
-        super(CalculateSLayer, self).__init__()
-        self.graph_builder = graph_builder
-        self.dep_emb = Embedding(self.graph_builder.num_edge_type, GraphLSTM.DEP_EMB_DIM, input_length=1)
-        self.dep_tanh = Dense(GraphLSTM.DEP_EMB_DIM + GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM * 2,
-                              activation='tanh')
-
-    def call(self, input, h):
-        """
-        Args:
-            input: a string denoting one single sentence
-            h: previous hidden state
-        """
-        # h: 13*60
-        doc = gen_dependency_tree(input)
-        leng_doc = len(doc)
-
-        matrix = self.graph_builder(doc)
-        # matrix: 13*13*2
-
-        unpreprocessed_unweight_adj_matrix = self.graph_builder.get_unweighted_matrix(doc)
-        # unpreprocessed_unweight_adj_matrix: 13*13*2
-
-        unweight_adj_matrix = tf.reshape(unpreprocessed_unweight_adj_matrix, (leng_doc, leng_doc, 2, 1))
-        unweight_adj_matrix = tf.broadcast_to(unweight_adj_matrix,
-                                              (leng_doc,
-                                               leng_doc,
-                                               2,
-                                               GraphLSTM.DEP_EMB_DIM + GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM * 2))
-        # unweight_adj_matrix: 13*13*2*70
-        embedded_matrix = self.dep_emb(matrix)
-        # embedded_matrix: 13*13*2*10
-        node_edge_h = tf.identity(h)
-        node_edge_h = tf.reshape(node_edge_h,
-                                 (len(doc), 1, 1, 2 * GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM))
-        node_edge_h = tf.broadcast_to(node_edge_h,
-                                      (len(doc), len(doc), 2, 2 * GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM))
-        node_edge_repr = tf.concat((embedded_matrix, node_edge_h), axis=3)
-        node_edge_repr = tf.multiply(unweight_adj_matrix, node_edge_repr)
-        # node_edge_repr: 13*13*2*70
-        node_edge_repr = self.dep_tanh(node_edge_repr)
-        s_in = tf.reduce_sum(node_edge_repr, axis=(0, 2))
-
-        reversed_node_edge_h = tf.identity(h)
-        reversed_node_edge_h = tf.reshape(reversed_node_edge_h,
-                                          (1, len(doc), 1, 2 * GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM))
-
-        reversed_node_edge_h = tf.broadcast_to(reversed_node_edge_h,
-                                               (len(doc), len(doc), 2, 2 * GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM))
-
-        reversed_node_edge_repr = tf.concat((embedded_matrix, reversed_node_edge_h), axis=3)
-        reversed_node_edge_repr = tf.multiply(unweight_adj_matrix, reversed_node_edge_repr)
-
-        # reversed_node_edge_repr: 13*13*2*70
-        reversed_node_edge_repr = self.dep_tanh(reversed_node_edge_repr)
-        s_out = tf.reduce_sum(reversed_node_edge_repr, axis=(1, 2))
-
-        return s_in, s_out
-
-
-class CustomizeLSTMCell(Layer):
-    def __init__(self):
-        super(CustomizeLSTMCell, self).__init__()
-        self.have_built_weight = False
-
-    def call(self, inputs):
-        s_in, s_out, h_in, h_out, last_c = inputs
-
-        if not self.have_built_weight:
-            number_of_token = h_in.shape[1]
-            number_units_h = h_in.shape[2]
-            number_units_s = s_in.shape[2]
-            self.w_in_input = self.add_weight('w_in_input',
-                                              shape=[number_units_h, number_units_s], dtype=tf.float32)
-            self.w_out_input = self.add_weight('w_out_input',
-                                               shape=[number_units_h, number_units_s], dtype=tf.float32)
-            self.u_in_input = self.add_weight('u_in_input',
-                                              shape=[number_units_h, number_units_h], dtype=tf.float32)
-            self.u_out_input = self.add_weight('u_out_input',
-                                               shape=[number_units_h, number_units_h], dtype=tf.float32)
-            self.b_input = self.add_weight('b_input',
-                                           shape=[number_units_h, ], dtype=tf.float32)
-            self.w_in_output = self.add_weight('w_in_output',
-                                               shape=[number_units_h, number_units_s], dtype=tf.float32)
-            self.w_out_output = self.add_weight('w_out_output',
-                                                shape=[number_units_h, number_units_s], dtype=tf.float32)
-            self.u_in_output = self.add_weight('u_in_output',
-                                               shape=[number_units_h, number_units_h], dtype=tf.float32)
-            self.u_out_output = self.add_weight('u_out_output',
-                                                shape=[number_units_h, number_units_h], dtype=tf.float32)
-            self.b_output = self.add_weight('b_output',
-                                            shape=[number_units_h, ], dtype=tf.float32)
-            self.w_in_forget = self.add_weight('w_in_forget',
-                                               shape=[number_units_h, number_units_s], dtype=tf.float32)
-            self.w_out_forget = self.add_weight('w_out_forget',
-                                                shape=[number_units_h, number_units_s], dtype=tf.float32)
-            self.u_in_forget = self.add_weight('u_in_forget',
-                                               shape=[number_units_h, number_units_h], dtype=tf.float32)
-            self.u_out_forget = self.add_weight('u_out_forget',
-                                                shape=[number_units_h, number_units_h], dtype=tf.float32)
-            self.b_forget = self.add_weight('b',
-                                            shape=[number_units_h, ], dtype=tf.float32)
-            self.w_in_update = self.add_weight('w_in_update',
-                                               shape=[number_units_h, number_units_s], dtype=tf.float32)
-            self.w_out_update = self.add_weight('w_out_update',
-                                                shape=[number_units_h, number_units_s], dtype=tf.float32)
-            self.u_in_update = self.add_weight('u_in_update',
-                                               shape=[number_units_h, number_units_h], dtype=tf.float32)
-            self.u_out_update = self.add_weight('u_out_update',
-                                                shape=[number_units_h, number_units_h], dtype=tf.float32)
-            self.b_update = self.add_weight('b_update',
-                                            shape=[number_units_h, ], dtype=tf.float32)
-            self.have_built_weight = True
-        assert number_of_token == h_out.shape[1]
-        assert number_of_token == s_in.shape[1]
-        assert number_of_token == s_out.shape[1]
-        assert number_of_token == last_c.shape[1]
-        input_gate = tf.sigmoid(tf.math.add_n((tf.matmul(self.w_in_input, s_in),
-                                               tf.matmul(self.w_out_input, s_out),
-                                               tf.matmul(self.u_in_input, h_in),
-                                               tf.matmul(self.u_out_input, h_out))))
-        output_gate = tf.sigmoid(tf.math.add_n((tf.matmul(self.w_in_input, s_in),
-                                                tf.matmul(self.w_out_input, s_out),
-                                                tf.matmul(self.u_in_input, h_in),
-                                                tf.matmul(self.u_out_input, h_out))))
-        forget_gate = tf.sigmoid(tf.math.add_n((tf.matmul(self.w_in_input, s_in),
-                                                tf.matmul(self.w_out_input, s_out),
-                                                tf.matmul(self.u_in_input, h_in),
-                                                tf.matmul(self.u_out_input, h_out))))
-        update_gate = tf.sigmoid(tf.math.add_n((tf.matmul(self.w_in_input, s_in),
-                                                tf.matmul(self.w_out_input, s_out),
-                                                tf.matmul(self.u_in_input, h_in),
-                                                tf.matmul(self.u_out_input, h_out))))
-        cell_state = tf.add(tf.multiply(forget_gate, last_c), tf.multiply(update_gate, input_gate))
-        hidden_state = tf.multiply(output_gate, cell_state)
-        cell_state = tf.reshape(cell_state, (-1, 1, number_of_token, number_units_h))
-        hidden_state = tf.reshape(hidden_state, (-1, 1, number_of_token, number_units_h))
-        return tf.concat((cell_state, hidden_state), axis=1)
+        print(h_history[-1])
+        return h_history[-1]  # change this later
 
 
 if __name__ == "__main__":
