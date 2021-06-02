@@ -66,8 +66,8 @@ class AdjMatrixBuilder:
         self.num_edge_type += 1
         self.NEXT_ARC = self.num_edge_type
         self.num_edge_type += 1
-    @staticmethod
-    def get_unweighted_matrix(doc):
+
+    def __call__(self, doc, return_weighted=True):
         """
         Args:
             doc: spacy doc
@@ -79,42 +79,16 @@ class AdjMatrixBuilder:
 
         for i in range(len(doc)):
             # self arc
-            matrix[i][i][0] = 1
-
+            if return_weighted:
+                matrix[i][i][0] = self.SELF_ARC
+            else:
+                matrix[i][i][0] = 1
             # next arc
             if i < len(doc) - 1:
-                matrix[i][i + 1][0] = 1
-
-        for i in range(len(doc)):
-            # out dependency arcs
-            # print("children of ", doc[i].text)
-            for child in doc[i].children:
-                # print(child.text, child.i)
-                matrix[i][child.i][1] = 1
-            # print()
-
-            # in dependency arcs
-        #             matrix[doc[i].head.i][i][1] = self.DEP_MAP[doc[i].dep_]
-
-        return tf.constant(matrix, dtype=tf.float32)
-
-    def __call__(self, doc):
-        """
-        Args:
-            doc: spacy doc
-
-        Returns:
-            2D numpy array denoting adjacency matrix
-        """
-        matrix = np.zeros(dtype=np.int16, shape=(len(doc), len(doc), 2))
-
-        for i in range(len(doc)):
-            # self arc
-            matrix[i][i][0] = self.SELF_ARC
-
-            # next arc
-            if i < len(doc) - 1:
-                matrix[i][i + 1][0] = self.NEXT_ARC
+                if return_weighted:
+                    matrix[i][i + 1][0] = self.NEXT_ARC
+                else:
+                    matrix[i][i + 1][0] = 1
 
         for i in range(len(doc)):
             # out dependency arcs
@@ -124,7 +98,10 @@ class AdjMatrixBuilder:
             #                 matrix[i][child.i][1] = self.DEP_MAP[child.dep_]
 
             # in dependency arcs
-            matrix[doc[i].head.i][i][1] = self.DEP_MAP[doc[i].dep_]
+            if return_weighted:
+                matrix[doc[i].head.i][i][1] = self.DEP_MAP[doc[i].dep_]
+            else:
+                matrix[doc[i].head.i][i][1] = 1
 
         return tf.constant(matrix, dtype=tf.float32)
 

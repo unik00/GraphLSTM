@@ -149,7 +149,7 @@ class CalculateHLayer(Layer):
         # out_edge_repr: 13*13*2*150 h(j, l)
         h_out = tf.multiply(out_edge_repr, unweight_adj_matrix)
         h_out = tf.reduce_sum(h_out, axis=(1, 2))
-        print(f'h out: {h_out}')
+        # print(f'h out: {h_out}')
         return h_in, h_out
 
 
@@ -211,76 +211,98 @@ class CalculateSLayer(Layer):
 
 class CustomizeLSTMCell(Layer):
     TRANSITION_STATE_OUTPUTS_DIM = 150
+
     def __init__(self):
         super(CustomizeLSTMCell, self).__init__()
         self.have_built_weight = False
+
+    def add_gate_weight(self, name, shape):
+        return self.add_weight(name, shape=shape, dtype=tf.float32)
+
+    @staticmethod
+    def call_gate_output(s_in, s_out, h_in, h_out, last_c, w_in, w_out, u_in, u_out, bias):
+        return tf.sigmoid(tf.math.add_n((tf.matmul(s_in, w_in),
+                                         tf.matmul(s_out, w_out),
+                                         tf.matmul(h_in, u_in),
+                                         tf.matmul(h_out, u_out),
+                                         bias)))
+
+    @staticmethod
+    def broadcast_bias_weight(number_of_token, bias):
+        number_of_unit = bias.shape[0]
+        bias = tf.reshape(bias, (1, number_of_unit))
+        bias = tf.broadcast_to(bias, (number_of_token, number_of_unit))
+        return bias
 
     def call(self, s_in, s_out, h_in, h_out, last_c):
         number_of_token = h_in.shape[0]
         number_units_h = h_in.shape[1]
         number_units_s = s_in.shape[1]
         if not self.have_built_weight:
-            self.w_in_input = self.add_weight('w_in_input',
-                                              shape=[number_units_s, number_units_h], dtype=tf.float32)
-            self.w_out_input = self.add_weight('w_out_input',
-                                               shape=[number_units_s, number_units_h], dtype=tf.float32)
-            self.u_in_input = self.add_weight('u_in_input',
-                                              shape=[number_units_h, number_units_h], dtype=tf.float32)
-            self.u_out_input = self.add_weight('u_out_input',
-                                               shape=[number_units_h, number_units_h], dtype=tf.float32)
-            self.b_input = self.add_weight('b_input',
-                                           shape=[number_units_h, ], dtype=tf.float32)
-            self.w_in_output = self.add_weight('w_in_output',
-                                               shape=[number_units_s, number_units_h], dtype=tf.float32)
-            self.w_out_output = self.add_weight('w_out_output',
-                                                shape=[number_units_s, number_units_h], dtype=tf.float32)
-            self.u_in_output = self.add_weight('u_in_output',
-                                               shape=[number_units_h, number_units_h], dtype=tf.float32)
-            self.u_out_output = self.add_weight('u_out_output',
-                                                shape=[number_units_h, number_units_h], dtype=tf.float32)
-            self.b_output = self.add_weight('b_output',
-                                            shape=[number_units_h, ], dtype=tf.float32)
-            self.w_in_forget = self.add_weight('w_in_forget',
-                                               shape=[number_units_s, number_units_h], dtype=tf.float32)
-            self.w_out_forget = self.add_weight('w_out_forget',
-                                                shape=[number_units_s, number_units_h], dtype=tf.float32)
-            self.u_in_forget = self.add_weight('u_in_forget',
-                                               shape=[number_units_h, number_units_h], dtype=tf.float32)
-            self.u_out_forget = self.add_weight('u_out_forget',
-                                                shape=[number_units_h, number_units_h], dtype=tf.float32)
-            self.b_forget = self.add_weight('b',
-                                            shape=[number_units_h, ], dtype=tf.float32)
-            self.w_in_update = self.add_weight('w_in_update',
-                                               shape=[number_units_s, number_units_h], dtype=tf.float32)
-            self.w_out_update = self.add_weight('w_out_update',
-                                                shape=[number_units_s, number_units_h], dtype=tf.float32)
-            self.u_in_update = self.add_weight('u_in_update',
-                                               shape=[number_units_h, number_units_h], dtype=tf.float32)
-            self.u_out_update = self.add_weight('u_out_update',
-                                                shape=[number_units_h, number_units_h], dtype=tf.float32)
-            self.b_update = self.add_weight('b_update',
-                                            shape=[number_units_h, ], dtype=tf.float32)
+            self.w_in_input = self.add_gate_weight('w_in_input', [number_units_s, number_units_h])
+            self.w_out_input = self.add_gate_weight('w_out_input', [number_units_s, number_units_h])
+            self.u_in_input = self.add_gate_weight('u_in_input', [number_units_h, number_units_h])
+            self.u_out_input = self.add_gate_weight('u_out_input', [number_units_h, number_units_h])
+            self.b_input = self.broadcast_bias_weight(number_of_token,
+                                                      self.add_gate_weight('b_input', [number_units_h, ]))
+            self.w_in_output = self.add_gate_weight('w_in_output', [number_units_s, number_units_h])
+            self.w_out_output = self.add_gate_weight('w_out_output', [number_units_s, number_units_h])
+            self.u_in_output = self.add_gate_weight('u_in_output', [number_units_h, number_units_h])
+            self.u_out_output = self.add_gate_weight('u_out_output', [number_units_h, number_units_h])
+            self.b_output = self.broadcast_bias_weight(number_of_token,
+                                                       self.add_gate_weight('b_output', [number_units_h, ]))
+            self.w_in_forget = self.add_gate_weight('w_in_forget', [number_units_s, number_units_h])
+            self.w_out_forget = self.add_gate_weight('w_out_forget', [number_units_s, number_units_h])
+            self.u_in_forget = self.add_gate_weight('u_in_forget', [number_units_h, number_units_h])
+            self.u_out_forget = self.add_gate_weight('u_out_forget', [number_units_h, number_units_h])
+            self.b_forget = self.broadcast_bias_weight(number_of_token,
+                                                       self.add_gate_weight('b', [number_units_h, ]))
+            self.w_in_update = self.add_gate_weight('w_in_update', [number_units_s, number_units_h])
+            self.w_out_update = self.add_gate_weight('w_out_update', [number_units_s, number_units_h])
+            self.u_in_update = self.add_gate_weight('u_in_update', [number_units_h, number_units_h])
+            self.u_out_update = self.add_gate_weight('u_out_update', [number_units_h, number_units_h])
+            self.b_update = self.broadcast_bias_weight(number_of_token,
+                                                       self.add_gate_weight('b_update', [number_units_h, ]))
             self.have_built_weight = True
         assert number_of_token == h_out.shape[0]
         assert number_of_token == s_in.shape[0]
         assert number_of_token == s_out.shape[0]
         assert number_of_token == last_c.shape[0]
-        input_gate = tf.sigmoid(tf.math.add_n((tf.matmul(s_in, self.w_in_input),
-                                               tf.matmul(s_out, self.w_out_input),
-                                               tf.matmul(h_in, self.u_in_input),
-                                               tf.matmul(h_out, self.u_out_input))))
-        output_gate = tf.sigmoid(tf.math.add_n((tf.matmul(s_in, self.w_in_input),
-                                                tf.matmul(s_out, self.w_out_input),
-                                                tf.matmul(h_in, self.u_in_input),
-                                                tf.matmul(h_out, self.u_out_input))))
-        forget_gate = tf.sigmoid(tf.math.add_n((tf.matmul(s_in, self.w_in_input),
-                                                tf.matmul(s_out, self.w_out_input),
-                                                tf.matmul(h_in, self.u_in_input),
-                                                tf.matmul(h_out, self.u_out_input))))
-        update_gate = tf.sigmoid(tf.math.add_n((tf.matmul(s_in, self.w_in_input),
-                                                tf.matmul(s_out, self.w_out_input),
-                                                tf.matmul(h_in, self.u_in_input),
-                                                tf.matmul(h_out, self.u_out_input))))
+
+        input_gate = self.call_gate_output(s_in, s_out, h_in, h_out, last_c,
+                                           self.w_in_input, self.w_out_input,
+                                           self.u_in_input, self.u_out_input,
+                                           self.b_input)
+        output_gate = self.call_gate_output(s_in, s_out, h_in, h_out, last_c,
+                                            self.w_in_output, self.w_out_output,
+                                            self.u_in_output, self.u_out_output,
+                                            self.b_output)
+        forget_gate = self.call_gate_output(s_in, s_out, h_in, h_out, last_c,
+                                            self.w_in_forget, self.w_out_forget,
+                                            self.u_in_forget, self.u_out_forget,
+                                            self.b_forget)
+        update_gate = self.call_gate_output(s_in, s_out, h_in, h_out, last_c,
+                                            self.w_in_update, self.w_out_update,
+                                            self.u_in_update, self.u_out_update,
+                                            self.b_update)
+
+        # input_gate1 = tf.sigmoid(tf.math.add_n((tf.matmul(s_in, self.w_in_input),
+        #                                         tf.matmul(s_out, self.w_out_input),
+        #                                         tf.matmul(h_in, self.u_in_input),
+        #                                         tf.matmul(h_out, self.u_out_input),
+        #                                         self.b_input)))
+        # output_gate = tf.sigmoid(tf.math.add_n((tf.matmul(s_in, self.w_in_input),
+        #                                         tf.matmul(s_out, self.w_out_input),
+        #                                         tf.matmul(h_in, self.u_in_input),
+        #                                         tf.matmul(h_out, self.u_out_input))))
+        # forget_gate = tf.sigmoid(tf.math.add_n((tf.matmul(s_in, self.w_in_input),
+        #                                         tf.matmul(s_out, self.w_out_input),
+        #                                         tf.matmul(h_in, self.u_in_input),
+        #                                         tf.matmul(h_out, self.u_out_input))))
+        # update_gate = tf.sigmoid(tf.math.add_n((tf.matmul(s_in, self.w_in_input),
+        #                                         tf.matmul(s_out, self.w_out_input),
+        #                                         tf.matmul(h_in, self.u_in_input),
+        #                                         tf.matmul(h_out, self.u_out_input))))
         cell_state = tf.add(tf.multiply(forget_gate, last_c), tf.multiply(update_gate, input_gate))
         hidden_state = tf.multiply(output_gate, tf.tanh(cell_state))
         return hidden_state, cell_state
@@ -345,7 +367,7 @@ class GraphLSTM(tf.keras.Model):
         # TODO: padding before inference?
         doc = gen_dependency_tree(input)
         matrix = self.graph_builder(doc)
-        unpreprocessed_unweight_adj_matrix = self.graph_builder.get_unweighted_matrix(doc)
+        unpreprocessed_unweight_adj_matrix = self.graph_builder(doc, return_weighted=False)
 
         emb = self.emb_single(doc)  # embedding layer
 
