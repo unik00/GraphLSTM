@@ -286,26 +286,6 @@ class CustomizeLSTMCell(Layer):
                                             self.u_in_update, self.u_out_update,
                                             self.b_update)
 
-        # input_gate1 = tf.sigmoid(tf.math.add_n((tf.matmul(s_in, self.w_in_input),
-        #                                         tf.matmul(s_out, self.w_out_input),
-        #                                         tf.matmul(h_in, self.u_in_input),
-        #                                         tf.matmul(h_out, self.u_out_input),
-        #                                         self.b_input)))
-        # output_gate = tf.sigmoid(tf.math.add_n((tf.matmul(s_in, self.w_in_input),
-        #                                         tf.matmul(s_out, self.w_out_input),
-        #                                         tf.matmul(h_in, self.u_in_input),
-        #                                         tf.matmul(h_out, self.u_out_input),
-        #                                         self.b_output)))
-        # forget_gate = tf.sigmoid(tf.math.add_n((tf.matmul(s_in, self.w_in_input),
-        #                                         tf.matmul(s_out, self.w_out_input),
-        #                                         tf.matmul(h_in, self.u_in_input),
-        #                                         tf.matmul(h_out, self.u_out_input),
-        #                                         self.b_forget)))
-        # update_gate = tf.sigmoid(tf.math.add_n((tf.matmul(s_in, self.w_in_input),
-        #                                         tf.matmul(s_out, self.w_out_input),
-        #                                         tf.matmul(h_in, self.u_in_input),
-        #                                         tf.matmul(h_out, self.u_out_input),
-        #                                         self.b_update)))
         cell_state = tf.add(tf.multiply(forget_gate, last_c), tf.multiply(update_gate, input_gate))
         hidden_state = tf.multiply(output_gate, tf.tanh(cell_state))
         return hidden_state, cell_state
