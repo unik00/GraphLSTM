@@ -28,5 +28,11 @@ def get_universal_POS():
 
 
 if __name__ == "__main__":
-    s = "A bilateral retrobulbar neuropathy with an unusual central bitemporal hemianopic scotoma was found"
-    print(get_universal_POS())
+    # s = "A bilateral retrobulbar neuropathy with an unusual central bitemporal hemianopic scotoma was found"
+    # print(get_universal_POS())
+    s =  "Two cases of hepatic adenoma and one of focal nodular hyperplasia presumably associated with the use of oral contraceptives, are reported. Special reference is made to their clinical presentation, which may be totally asymptomatic. Liver-function tests are of little diagnostic value, but valuable information may be obtained from both liver scanning and hepatic angiography. Histologic differences and clinical similarities between hepatic adenoma and focal nodular hyperplasia of the liver are discussed."
+    # from spacy import displacy
+    doc = gen_dependency_tree(s)
+    # displacy.serve(doc, style="dep")
+    for x in doc:
+        print(x)

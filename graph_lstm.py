@@ -291,6 +291,16 @@ class CustomizeLSTMCell(Layer):
         return hidden_state, cell_state
 
 
+class EntityRelation(Layer):
+    """ Given hidden node states, calculate the relation score between given Chemical and Disease"""
+    def __init__(self):
+
+        pass
+
+    def call(self, input):
+        pass
+
+
 class GraphLSTM(tf.keras.Model):
     BI_LSTM_PHASE_1_OUTPUT_DIM = 30
     DEP_EMB_DIM = 10
@@ -311,10 +321,6 @@ class GraphLSTM(tf.keras.Model):
                                            return_state=False))
 
         self.graph_builder = AdjMatrixBuilder()
-        self.dep_emb = Embedding(self.graph_builder.num_edge_type, self.DEP_EMB_DIM, input_length=1)
-        self.dep_tanh = Dense(self.DEP_EMB_DIM +
-                              self.BI_LSTM_PHASE_1_OUTPUT_DIM * 2,
-                              activation='tanh')
 
         self.s_calculator = CalculateSLayer(self.graph_builder)
         self.h_calculator = CalculateHLayer()

@@ -91,13 +91,6 @@ class AdjMatrixBuilder:
                     matrix[i][i + 1][0] = 1
 
         for i in range(len(doc)):
-            # out dependency arcs
-            # print("children of ", doc[i].text)
-            #             for child in doc[i].children:
-            #                 # print(child.text, child.i)
-            #                 matrix[i][child.i][1] = self.DEP_MAP[child.dep_]
-
-            # in dependency arcs
             if return_weighted:
                 matrix[doc[i].head.i][i][1] = self.DEP_MAP[doc[i].dep_]
             else:
