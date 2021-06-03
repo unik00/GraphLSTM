@@ -291,14 +291,14 @@ class CustomizeLSTMCell(Layer):
         return hidden_state, cell_state
 
 
-class EntityRelation(Layer):
+class ScoreLayer(Layer):
     """ Given hidden node states, calculate the relation score between given Chemical and Disease"""
 
     REDUCED_C_DIM = 20
     REDUCED_D_DIM = 21
     POSITION_EMBEDDING_IN_DIM = 100
     POSITION_EMBEDDING_OUT_DIM = 30
-    SCORE_DIM = 20
+    SCORE_DIM = 2
 
     def __init__(self):
         super().__init__()
@@ -348,8 +348,9 @@ class EntityRelation(Layer):
                         if a is None:
                             a = current
                         else:
-                            a = tf.math.maximum(a, current)
-                output[(chemical, disease)] = a
+                            a = tf.reduce_max((a, current), axis=0)
+
+                output[(chemical, disease)] = tf.nn.softmax(a)
         return output
 
 
@@ -377,7 +378,7 @@ class GraphLSTM(tf.keras.Model):
         self.s_calculator = CalculateSLayer(self.graph_builder)
         self.h_calculator = CalculateHLayer()
         self.state_transition = CustomizeLSTMCell()
-        self.score_layer = EntityRelation()
+        self.score_layer = ScoreLayer()
 
     def emb_single(self, doc):
         """ Returns embedding for one sentence

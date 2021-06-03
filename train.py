@@ -3,27 +3,51 @@ import tensorflow as tf
 from cdr_data import CDRData
 from graph_lstm import GraphLSTM
 
+
+def make_golden(input_dict):
+    golden = list()
+    for c in input_dict['Chemical']:
+        for d in input_dict['Disease']:
+            if (c, d) in input_dict['relation']:
+                golden.append([tf.constant([1., 0.])])
+            else:
+                golden.append([tf.constant([0., 1.])])
+    return tf.convert_to_tensor(golden)
+
+
+def make_tensor_from_dict(output_dict):
+    output = list()
+    for key in output_dict:
+        output.append(output_dict[key])
+    return tf.convert_to_tensor(output)
+
+
 if __name__ == "__main__":
-    s = "A bilateral retrobulbar neuropathy with an unusual central bitemporal hemianopic scotoma was found"
-
-    data = CDRData()
-
-    model = GraphLSTM(data)
+    dataset = CDRData()
+    model = GraphLSTM(dataset)
 
     optimizer = tf.keras.optimizers.SGD(learning_rate=1)
     loss_fn = tf.keras.losses.MSE
 
-    epochs = 1
+    train_data = dataset.build_data_from_file(dataset.DEV_DATA_PATH, mode='inter')
+
+    epochs = 10
     batch_size = 1
     for epoch in range(epochs):
         print("\nStart of epoch %d" % (epoch,))
 
-        # Iterate over the batches of the dataset.
-        for step, (x_batch_train, y_batch_train) in enumerate([(s, tf.zeros(shape=(13, 150)))]):
+        for step, x_train in enumerate(train_data):
+            if len(x_train['Chemical']) == 0 or len(x_train['Disease']) == 0:
+                continue
+
+            y_train = make_golden(x_train)
+
             with tf.GradientTape() as tape:
-                logits = model(x_batch_train)  # Logits for this minibatch
-                print("logits: ", logits, y_batch_train)
-                loss_value = loss_fn(y_batch_train, logits)
+                logits = model(x_train)  # Logits for this minibatch
+                logits = make_tensor_from_dict(logits)
+
+                print("logits: ", logits, y_train)
+                loss_value = loss_fn(y_train, logits)
 
             grads = tape.gradient(loss_value, model.trainable_weights)
 
@@ -38,13 +62,8 @@ if __name__ == "__main__":
 
     model.save_weights("saved_weights/saved")
 
-    new_model = GraphLSTM(dataset=data)
-
-    print("before: ")
-    print(new_model(s))
+    new_model = GraphLSTM(dataset=dataset)
 
     new_model.load_weights("saved_weights/saved")
-    print("after: ")
-    print(new_model(s))
 
     new_model.summary()
