@@ -91,10 +91,12 @@ class AdjMatrixBuilder:
                     matrix[i][i + 1][0] = 1
 
         for i in range(len(doc)):
+            # subtract doc[0].i because tokens are not enumerated from zeros
+
             if return_weighted:
-                matrix[doc[i].head.i][i][1] = self.DEP_MAP[doc[i].dep_]
+                matrix[doc[i].head.i - doc[0].i][i][1] = self.DEP_MAP[doc[i].dep_]
             else:
-                matrix[doc[i].head.i][i][1] = 1
+                matrix[doc[i].head.i - doc[0].i][i][1] = 1
 
         return tf.constant(matrix, dtype=tf.float32)
 

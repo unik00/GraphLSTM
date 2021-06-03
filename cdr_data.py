@@ -84,7 +84,8 @@ def build_inter_sentence_docs_from_file(path):
                 current_dict["relation"].add((relation.infons.get("Chemical"),
                                               relation.infons.get("Disease")))
             ret.append(current_dict)
-
+            if len(ret) > 6:
+                break
     return ret
 
 
@@ -116,7 +117,6 @@ def build_intra_sentence_docs_from_file(path):
                 if relation[0] in new_dict["Chemical"] and relation[1] in new_dict["Disease"]:
                     new_dict["relation"].add(relation)
 
-            print(new_dict)
             new_list.append(new_dict)
     return new_list
 
@@ -134,11 +134,9 @@ class CDRData:
             reader = bioc.BioCXMLDocumentReader(fp)
             collection_info = reader.get_collection_info()
             for document in reader:
-                # process document
                 print("document: ", document)
                 for passage in document.passages:
                     assert (len(passage.relations) == 0)
-                    # print(passage.text)
                     dependency = gen_dependency_tree(passage.text)
                     for token in dependency:
                         ret[normalize(token.text)] = 1

@@ -301,10 +301,13 @@ class EntityRelation(Layer):
     SCORE_DIM = 20
 
     def __init__(self):
+        super().__init__()
         self.reduce_c = Dense(self.REDUCED_C_DIM, activation='tanh')
         self.reduce_d = Dense(self.REDUCED_D_DIM, activation='tanh')
         self.score = Dense(self.SCORE_DIM)
-        self.position_embedding = Embedding(self.POSITION_EMBEDDING_IN_DIM, self.POSITION_EMBEDDING_OUT_DIM)
+        self.position_embedding = Embedding(self.POSITION_EMBEDDING_IN_DIM,
+                                            self.POSITION_EMBEDDING_OUT_DIM,
+                                            input_length=1)
 
     def reduce(self, input_doc, list_input, h, layer):
         ret = list()
@@ -312,8 +315,8 @@ class EntityRelation(Layer):
             sum_over_span = tf.zeros(shape=h[0].shape)
             for token_id in range(token_range[0], token_range[1]):
                 # token_id - input_doc[0].i: token.i might not be starting at zero, subtract the offset
-                sum_over_span = tf.reduce_sum([sum_over_span, h[token_id - input_doc[0].i]], dim=0)
-
+                sum_over_span = tf.reduce_sum([sum_over_span, h[token_id - input_doc[0].i]], axis=0)
+            sum_over_span = tf.expand_dims(sum_over_span, axis=0)
             ret.append((layer(sum_over_span), token_range[0]))  # TODO: ask for p_i_j elaboration
         return ret
 
@@ -338,7 +341,10 @@ class EntityRelation(Layer):
                 for i in range(len(list_c)):
                     for j in range(len(list_d)):
                         emb = self.position_embedding(tf.math.abs(list_c[i][1] - list_d[j][1]))
-                        current = self.score(tf.concat((list_c[i][0], list_d[j][0], emb), concat_dim=1))
+                        emb = tf.reshape(emb, [1, -1])
+
+                        current = self.score(tf.concat((list_c[i][0], list_d[j][0], emb), axis=1))
+
                         if a is None:
                             a = current
                         else:
@@ -402,6 +408,8 @@ class GraphLSTM(tf.keras.Model):
         """
         # TODO: padding before inference?
         doc = input_dict['doc']
+        print(doc)
+
         matrix = self.graph_builder(doc)
         unpreprocessed_unweight_adj_matrix = self.graph_builder(doc, return_weighted=False)
 
@@ -410,8 +418,6 @@ class GraphLSTM(tf.keras.Model):
         emb = tf.expand_dims(emb, axis=0)
 
         emb = self.biLSTM_1(emb)
-
-        print("emb shape: ", emb.shape)
 
         bi_lstm_output = tf.identity(emb)
         bi_lstm_output = tf.reshape(bi_lstm_output, (bi_lstm_output.shape[1], bi_lstm_output.shape[2]))
@@ -426,20 +432,19 @@ class GraphLSTM(tf.keras.Model):
             h_history.append(h)
             c_history.append(c)
 
-        print(h_history[-1])
         output = self.score_layer(h_history[-1], input_dict)
         return output
 
 
 if __name__ == "__main__":
-    s = "A bilateral retrobulbar neuropathy with an unusual central bitemporal hemianopic scotoma was found"
-
     dataset = CDRData()
 
     model = GraphLSTM(dataset)
-    # model.emb_single(s)
 
     train_data = dataset.build_data_from_file(dataset.DEV_DATA_PATH, mode='intra')
 
-    print(train_data[0])
-    print(model(train_data[0]))
+    for i in range(len(train_data)):
+        if len(train_data[i]['Chemical']) > 0 and len(train_data[i]['Disease']) > 0:
+            print(i)
+            print("output: ", model(train_data[i]))
+            break
