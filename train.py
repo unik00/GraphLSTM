@@ -13,13 +13,13 @@ if __name__ == "__main__":
     optimizer = tf.keras.optimizers.SGD(learning_rate=1)
     loss_fn = tf.keras.losses.MSE
 
-    epochs = 100
+    epochs = 1
     batch_size = 1
     for epoch in range(epochs):
         print("\nStart of epoch %d" % (epoch,))
 
         # Iterate over the batches of the dataset.
-        for step, (x_batch_train, y_batch_train) in enumerate([(s, tf.zeros(shape=(1,13,60)))]):
+        for step, (x_batch_train, y_batch_train) in enumerate([(s, tf.zeros(shape=(13, 150)))]):
             with tf.GradientTape() as tape:
                 logits = model(x_batch_train)  # Logits for this minibatch
                 print("logits: ", logits, y_batch_train)
