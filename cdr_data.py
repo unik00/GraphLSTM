@@ -84,8 +84,7 @@ def build_inter_sentence_docs_from_file(path):
                 current_dict["relation"].add((relation.infons.get("Chemical"),
                                               relation.infons.get("Disease")))
             ret.append(current_dict)
-            if len(ret) > 6:
-                break
+
     return ret
 
 

@@ -221,18 +221,15 @@ class CustomizeLSTMCell(Layer):
 
     @staticmethod
     def call_gate_output(s_in, s_out, h_in, h_out, last_c, w_in, w_out, u_in, u_out, bias):
+        number_of_token = s_in.shape[0]
+        number_of_bias_unit = bias.shape[0]
+        broadcast_bias = tf.reshape(bias, (1, number_of_bias_unit))
+        broadcast_bias = tf.broadcast_to(broadcast_bias, (number_of_token, number_of_bias_unit))
         return tf.sigmoid(tf.math.add_n((tf.matmul(s_in, w_in),
                                          tf.matmul(s_out, w_out),
                                          tf.matmul(h_in, u_in),
                                          tf.matmul(h_out, u_out),
-                                         bias)))
-
-    @staticmethod
-    def broadcast_bias_weight(number_of_token, bias):
-        number_of_unit = bias.shape[0]
-        bias = tf.reshape(bias, (1, number_of_unit))
-        bias = tf.broadcast_to(bias, (number_of_token, number_of_unit))
-        return bias
+                                         broadcast_bias)))
 
     def call(self, s_in, s_out, h_in, h_out, last_c):
         number_of_token = h_in.shape[0]
@@ -243,27 +240,24 @@ class CustomizeLSTMCell(Layer):
             self.w_out_input = self.add_gate_weight('w_out_input', [number_units_s, number_units_h])
             self.u_in_input = self.add_gate_weight('u_in_input', [number_units_h, number_units_h])
             self.u_out_input = self.add_gate_weight('u_out_input', [number_units_h, number_units_h])
-            self.b_input = self.broadcast_bias_weight(number_of_token,
-                                                      self.add_gate_weight('b_input', [number_units_h, ]))
+            self.b_input = self.add_gate_weight('b_input', [number_units_h, ])
             self.w_in_output = self.add_gate_weight('w_in_output', [number_units_s, number_units_h])
             self.w_out_output = self.add_gate_weight('w_out_output', [number_units_s, number_units_h])
             self.u_in_output = self.add_gate_weight('u_in_output', [number_units_h, number_units_h])
             self.u_out_output = self.add_gate_weight('u_out_output', [number_units_h, number_units_h])
-            self.b_output = self.broadcast_bias_weight(number_of_token,
-                                                       self.add_gate_weight('b_output', [number_units_h, ]))
+            self.b_output = self.add_gate_weight('b_output', [number_units_h, ])
             self.w_in_forget = self.add_gate_weight('w_in_forget', [number_units_s, number_units_h])
             self.w_out_forget = self.add_gate_weight('w_out_forget', [number_units_s, number_units_h])
             self.u_in_forget = self.add_gate_weight('u_in_forget', [number_units_h, number_units_h])
             self.u_out_forget = self.add_gate_weight('u_out_forget', [number_units_h, number_units_h])
-            self.b_forget = self.broadcast_bias_weight(number_of_token,
-                                                       self.add_gate_weight('b', [number_units_h, ]))
+            self.b_forget = self.add_gate_weight('b', [number_units_h, ])
             self.w_in_update = self.add_gate_weight('w_in_update', [number_units_s, number_units_h])
             self.w_out_update = self.add_gate_weight('w_out_update', [number_units_s, number_units_h])
             self.u_in_update = self.add_gate_weight('u_in_update', [number_units_h, number_units_h])
             self.u_out_update = self.add_gate_weight('u_out_update', [number_units_h, number_units_h])
-            self.b_update = self.broadcast_bias_weight(number_of_token,
-                                                       self.add_gate_weight('b_update', [number_units_h, ]))
+            self.b_update = self.add_gate_weight('b_update', [number_units_h, ])
             self.have_built_weight = True
+
         assert number_of_token == h_out.shape[0]
         assert number_of_token == s_in.shape[0]
         assert number_of_token == s_out.shape[0]
@@ -340,6 +334,7 @@ class ScoreLayer(Layer):
                 a = None
                 for i in range(len(list_c)):
                     for j in range(len(list_d)):
+
                         emb = self.position_embedding(tf.math.abs(list_c[i][1] - list_d[j][1]))
                         emb = tf.reshape(emb, [1, -1])
 
