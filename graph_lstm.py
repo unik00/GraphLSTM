@@ -334,6 +334,7 @@ class ScoreLayer(Layer):
                 a = None
                 for i in range(len(list_c)):
                     for j in range(len(list_d)):
+
                         emb = self.position_embedding(tf.math.abs(list_c[i][1] - list_d[j][1]))
                         emb = tf.reshape(emb, [1, -1])
 

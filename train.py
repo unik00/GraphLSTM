@@ -29,7 +29,7 @@ if __name__ == "__main__":
     optimizer = tf.keras.optimizers.SGD(learning_rate=1)
     loss_fn = tf.keras.losses.MSE
 
-    train_data = dataset.build_data_from_file(dataset.DEV_DATA_PATH, mode='inter')
+    train_data = dataset.build_data_from_file(dataset.DEV_DATA_PATH, mode='intra')
 
     epochs = 10
     batch_size = 1
@@ -56,7 +56,7 @@ if __name__ == "__main__":
             # Log every 200 batches.
             if step % 1 == 0:
                 print(
-                    "Training loss (for one batch) at step {}: {}".format(step, loss_value)
+                    "Training loss (for one batch) at step {}: {}".format(step, tf.norm(loss_value))
                 )
                 print("Seen so far: %s samples" % ((step + 1) * batch_size))
 
