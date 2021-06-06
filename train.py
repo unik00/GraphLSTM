@@ -41,7 +41,7 @@ if __name__ == "__main__":
                 continue
 
             y_train = make_golden(x_train)
-
+            print(x_train)
             with tf.GradientTape() as tape:
                 logits = model(x_train)  # Logits for this minibatch
                 logits = make_tensor_from_dict(logits)
@@ -50,10 +50,10 @@ if __name__ == "__main__":
                 loss_value = loss_fn(y_train, logits)
 
             grads = tape.gradient(loss_value, model.trainable_weights)
+            # print(model.trainable_weights)
 
             optimizer.apply_gradients(zip(grads, model.trainable_weights))
 
-            # Log every 200 batches.
             if step % 1 == 0:
                 print(
                     "Training loss (for one batch) at step {}: {}".format(step, tf.norm(loss_value))
@@ -66,4 +66,4 @@ if __name__ == "__main__":
 
     new_model.load_weights("saved_weights/saved")
 
-    new_model.summary()
+    model.summary()

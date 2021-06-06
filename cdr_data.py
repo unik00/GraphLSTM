@@ -126,6 +126,9 @@ class CDRData:
     DEV_DATA_PATH = "BioCreative-V-CDR-Corpus/CDR_Data/CDR.Corpus.v010516/CDR_DevelopmentSet.BioC.xml"
     TRAIN_DATA_PATH = "BioCreative-V-CDR-Corpus/CDR_Data/CDR.Corpus.v010516/CDR_TrainingSet.BioC.xml"
 
+    BUILT_INTER_DATA_PATH = ""
+    BUILT_INTRA_DATA_PATH = ""
+
     def build_vocab_from_raw_data(self, filename, write_down=True):
         ret = dict()
 
@@ -174,16 +177,24 @@ class CDRData:
         m = {**m1, **m2}
         return m
 
-    # TODO: save to file
-    def build_data_from_file(self, path, mode):
+    # TODO: save to pickle if found pickle file. Rebuild if force_rebuild = True
+    def build_data_from_file(self, path, mode, force_rebuild=False):
         """
         Args:
+            force_rebuild: a boolean
             path: a string
             mode: either "inter" or "intra"
         """
         if mode == "inter":
-            return build_inter_sentence_docs_from_file(path)
+            if not force_rebuild and path.exists(self.BUILT_INTER_DATA_PATH):
+                # load from pickle
+                pass
+            else:
+                built = build_inter_sentence_docs_from_file(path)
+                # implement save to pickle here
+                return built
         elif mode == "intra":
+            # implement the same as above
             return build_intra_sentence_docs_from_file(path)
 
     def __init__(self, build_vocab=False):

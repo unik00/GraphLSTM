@@ -307,7 +307,8 @@ class ScoreLayer(Layer):
         ret = list()
         for token_range in list_input:
             sum_over_span = tf.zeros(shape=h[0].shape)
-            for token_id in range(token_range[0], token_range[1]):
+            assert token_range[1] - token_range[0] >= 0, print(input_doc)
+            for token_id in range(token_range[0], token_range[1] + 1):
                 # token_id - input_doc[0].i: token.i might not be starting at zero, subtract the offset
                 sum_over_span = tf.reduce_sum([sum_over_span, h[token_id - input_doc[0].i]], axis=0)
             sum_over_span = tf.expand_dims(sum_over_span, axis=0)
