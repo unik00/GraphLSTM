@@ -97,8 +97,8 @@ def build_intra_sentence_docs_from_file(path):
     new_list = list()
     for old_dict in inter_list:
         old_doc = old_dict["doc"]
-        new_dict = dict()
         for sent in old_doc.sents:
+            new_dict = dict()
             new_dict["doc"] = sent
             new_dict["Chemical"] = dict()
             new_dict["Disease"] = dict()
