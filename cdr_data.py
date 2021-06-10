@@ -107,7 +107,7 @@ def build_intra_sentence_docs_from_file(path):
             for typ in ["Chemical", "Disease"]:
                 for MESH in old_dict[typ]:
                     for pos in old_dict[typ][MESH]:
-                        if pos[0] >= sent.start and pos[1] <= sent.end:
+                        if pos[0] >= sent.start and pos[1] < sent.end:
                             if MESH not in new_dict[typ]:
                                 new_dict[typ][MESH] = list()
                             new_dict[typ][MESH].append(pos)
@@ -126,8 +126,6 @@ class CDRData:
     DEV_DATA_PATH = "BioCreative-V-CDR-Corpus/CDR_Data/CDR.Corpus.v010516/CDR_DevelopmentSet.BioC.xml"
     TRAIN_DATA_PATH = "BioCreative-V-CDR-Corpus/CDR_Data/CDR.Corpus.v010516/CDR_TrainingSet.BioC.xml"
 
-    BUILT_INTER_DATA_PATH = ""
-    BUILT_INTRA_DATA_PATH = ""
 
     def build_vocab_from_raw_data(self, filename, write_down=True):
         ret = dict()
@@ -186,15 +184,8 @@ class CDRData:
             mode: either "inter" or "intra"
         """
         if mode == "inter":
-            if not force_rebuild and path.exists(self.BUILT_INTER_DATA_PATH):
-                # load from pickle
-                pass
-            else:
-                built = build_inter_sentence_docs_from_file(path)
-                # implement save to pickle here
-                return built
+            return build_inter_sentence_docs_from_file(path)
         elif mode == "intra":
-            # implement the same as above
             return build_intra_sentence_docs_from_file(path)
 
     def __init__(self, build_vocab=False):
