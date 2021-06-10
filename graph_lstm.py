@@ -11,7 +11,7 @@ from graph_lstm_utils import AdjMatrixBuilder
 
 
 class CNNCharEmbedding(Layer):
-    PADDED_LENGTH = 20
+    PADDED_LENGTH = 50
     CONV_SIZE = 3
     NUM_FILTERS = 20
     CHAR_DIM = 4
@@ -305,6 +305,7 @@ class ScoreLayer(Layer):
 
     def reduce(self, input_doc, list_input, h, layer):
         ret = list()
+
         for token_range in list_input:
             sum_over_span = tf.zeros(shape=h[0].shape)
             assert token_range[1] - token_range[0] >= 0, print(input_doc)
@@ -405,7 +406,6 @@ class GraphLSTM(tf.keras.Model):
         """
         # TODO: padding before inference?
         doc = input_dict['doc']
-        print(doc)
 
         matrix = self.graph_builder(doc)
         unpreprocessed_unweight_adj_matrix = self.graph_builder(doc, return_weighted=False)

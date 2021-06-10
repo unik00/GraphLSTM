@@ -1,3 +1,4 @@
+import time
 import tensorflow as tf
 
 from cdr_data import CDRData
@@ -29,7 +30,11 @@ if __name__ == "__main__":
     optimizer = tf.keras.optimizers.SGD(learning_rate=1)
     loss_fn = tf.keras.losses.MSE
 
-    train_data = dataset.build_data_from_file(dataset.DEV_DATA_PATH, mode='intra')
+    start_time = time.time()
+    train_data = dataset.build_data_from_file(dataset.TRAIN_DATA_PATH, mode='intra')
+    train_data += dataset.build_data_from_file(dataset.DEV_DATA_PATH, mode='intra')
+
+    print("Load data time: ", time.time() - start_time)
 
     epochs = 10
     batch_size = 1
@@ -41,12 +46,12 @@ if __name__ == "__main__":
                 continue
 
             y_train = make_golden(x_train)
-            print(x_train)
+
             with tf.GradientTape() as tape:
                 logits = model(x_train)  # Logits for this minibatch
                 logits = make_tensor_from_dict(logits)
 
-                print("logits: ", logits, y_train)
+                # print("logits: ", logits, y_train)
                 loss_value = loss_fn(y_train, logits)
 
             grads = tape.gradient(loss_value, model.trainable_weights)
