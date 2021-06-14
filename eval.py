@@ -26,11 +26,8 @@ if __name__ == "__main__":
             logits = model(x_dev)
             logits = make_tensor_from_dict(logits)
 
-        for logit in logits.numpy().tolist():
-            all_pred.append(tf.math.argmax(logit[0]))
-
-        for golden in y_dev.numpy().tolist():
-            all_golden.append(tf.math.argmax(golden[0]))
+        all_pred += [tf.math.argmax(logit[0]) for logit in logits]
+        all_golden += [tf.math.argmax(golden[0]) for golden in y_dev]
 
     model.summary()
     print(all_golden)
