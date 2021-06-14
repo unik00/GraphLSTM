@@ -11,7 +11,7 @@ from graph_lstm_utils import AdjMatrixBuilder
 
 
 class CNNCharEmbedding(Layer):
-    PADDED_LENGTH = 50
+    PADDED_LENGTH = 100
     CONV_SIZE = 3
     NUM_FILTERS = 20
     CHAR_DIM = 4
@@ -45,7 +45,7 @@ class CNNCharEmbedding(Layer):
         front = [0] * ((self.PADDED_LENGTH - len(emb_chars)) // 2)
         end = [0] * ((self.PADDED_LENGTH - len(emb_chars) + 1) // 2)
         ret = front + emb_chars + end
-        assert len(ret) == self.PADDED_LENGTH
+        assert len(ret) == self.PADDED_LENGTH, print(len(ret), self.PADDED_LENGTH)
         return ret
 
     def call(self, inputs: List[str]):
