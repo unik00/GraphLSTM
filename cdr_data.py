@@ -22,7 +22,7 @@ def write_dict_down(d, filepath):
             f.write(key + "\n")
 
 
-def build_inter_sentence_docs_from_file(path):
+def build_inter_sentence_docs_from_file(path, limit=None):
     """
     Args:
         path: a string denoting a path
@@ -83,12 +83,15 @@ def build_inter_sentence_docs_from_file(path):
                 assert relation.infons.get("relation") == "CID"
                 current_dict["relation"].add((relation.infons.get("Chemical"),
                                               relation.infons.get("Disease")))
+
             ret.append(current_dict)
+            if limit is not None and len(ret) == limit:
+                return ret
 
     return ret
 
 
-def build_intra_sentence_docs_from_file(path):
+def build_intra_sentence_docs_from_file(path, limit=None):
     """ Refer to build_intra_sentence_docs_from_file() docstring for arguments explanation """
     # build inter sentence level first
     inter_list = build_inter_sentence_docs_from_file(path)
@@ -117,6 +120,8 @@ def build_intra_sentence_docs_from_file(path):
                     new_dict["relation"].add(relation)
 
             new_list.append(new_dict)
+            if limit is not None and len(new_list) == limit:
+                return new_list
     return new_list
 
 
@@ -125,7 +130,6 @@ class CDRData:
     DEFAULT_CHAR_DICT_PATH = "saved_datas/char_dict.txt"
     DEV_DATA_PATH = "BioCreative-V-CDR-Corpus/CDR_Data/CDR.Corpus.v010516/CDR_DevelopmentSet.BioC.xml"
     TRAIN_DATA_PATH = "BioCreative-V-CDR-Corpus/CDR_Data/CDR.Corpus.v010516/CDR_TrainingSet.BioC.xml"
-
 
     def build_vocab_from_raw_data(self, filename, write_down=True):
         ret = dict()
@@ -175,18 +179,17 @@ class CDRData:
         m = {**m1, **m2}
         return m
 
-    # TODO: save to pickle if found pickle file. Rebuild if force_rebuild = True
-    def build_data_from_file(self, path, mode, force_rebuild=False):
+    def build_data_from_file(self, path, mode, limit=None):
         """
         Args:
-            force_rebuild: a boolean
             path: a string
             mode: either "inter" or "intra"
+            limit: a integer, limit of data length (mainly for debug)
         """
         if mode == "inter":
-            return build_inter_sentence_docs_from_file(path)
+            return build_inter_sentence_docs_from_file(path, limit)
         elif mode == "intra":
-            return build_intra_sentence_docs_from_file(path)
+            return build_intra_sentence_docs_from_file(path, limit)
 
     def __init__(self, build_vocab=False):
         if not path.exists(self.DEFAULT_VOCAB_PATH) \
