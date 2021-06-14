@@ -27,17 +27,17 @@ if __name__ == "__main__":
     dataset = CDRData()
     model = GraphLSTM(dataset)
 
-    optimizer = tf.keras.optimizers.SGD(learning_rate=1)
-    loss_fn = tf.keras.losses.MSE
+    optimizer = tf.keras.optimizers.SGD(learning_rate=0.01)
+    loss_fn = tf.keras.losses.categorical_crossentropy
 
     start_time = time.time()
     train_data = dataset.build_data_from_file(dataset.TRAIN_DATA_PATH, mode='intra')
-    train_data += dataset.build_data_from_file(dataset.DEV_DATA_PATH, mode='intra')
 
     print("Load data time: ", time.time() - start_time)
 
-    epochs = 10
+    epochs = 5
     batch_size = 1
+
     for epoch in range(epochs):
         print("\nStart of epoch %d" % (epoch,))
 
@@ -64,11 +64,5 @@ if __name__ == "__main__":
                     "Training loss (for one batch) at step {}: {}".format(step, tf.norm(loss_value))
                 )
                 print("Seen so far: %s samples" % ((step + 1) * batch_size))
+                model.save_weights("saved_weights/saved")
 
-    model.save_weights("saved_weights/saved")
-
-    new_model = GraphLSTM(dataset=dataset)
-
-    new_model.load_weights("saved_weights/saved")
-
-    model.summary()
