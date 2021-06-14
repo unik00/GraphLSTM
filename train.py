@@ -64,5 +64,5 @@ if __name__ == "__main__":
                     "Training loss (for one batch) at step {}: {}".format(step, tf.norm(loss_value))
                 )
                 print("Seen so far: %s samples" % ((step + 1) * batch_size))
-                model.save_weights("saved_weights/saved")
+        model.save_weights("saved_weights/saved")
 
