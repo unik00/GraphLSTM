@@ -336,7 +336,7 @@ class ScoreLayer(Layer):
                     for j in range(len(list_d)):
 
                         emb = self.position_embedding(min(abs(list_c[i][1] - list_d[j][1]),
-                                                          self.POSITION_EMBEDDING_IN_DIM))
+                                                          self.POSITION_EMBEDDING_IN_DIM - 1))
                         emb = tf.reshape(emb, [1, -1])
 
                         current = self.score(tf.concat((list_c[i][0], list_d[j][0], emb), axis=1))
