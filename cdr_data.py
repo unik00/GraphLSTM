@@ -130,8 +130,10 @@ def build_intra_sentence_docs_from_file(path, limit=None):
 class CDRData:
     DEFAULT_VOCAB_PATH = "saved_datas/train_vocab.txt"
     DEFAULT_CHAR_DICT_PATH = "saved_datas/char_dict.txt"
+
     DEV_DATA_PATH = "BioCreative-V-CDR-Corpus/CDR_Data/CDR.Corpus.v010516/CDR_DevelopmentSet.BioC.xml"
     TRAIN_DATA_PATH = "BioCreative-V-CDR-Corpus/CDR_Data/CDR.Corpus.v010516/CDR_TrainingSet.BioC.xml"
+    TEST_DATA_PATH = "BioCreative-V-CDR-Corpus/CDR_Data/CDR.Corpus.v010516/CDR_TestSet.BioC.xml"
 
     def build_vocab_from_raw_data(self, filename, write_down=True):
         ret = dict()

@@ -22,6 +22,8 @@ if __name__ == "__main__":
         data_path = dataset.DEV_DATA_PATH
     elif args.data_type == "train":
         data_path = dataset.TRAIN_DATA_PATH
+    elif args.data_type == "test":
+        data_path = dataset.TEST_DATA_PATH
 
     model = GraphLSTM(dataset)
 
