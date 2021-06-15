@@ -9,14 +9,14 @@ from graph_lstm import GraphLSTM
 from train import make_golden, make_tensor_from_dict
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-l", "--limit", help="limit on the evalation set", type=int)
-parser.add_argument("-d", "--data_type", help="one of train/dev/test", type=str)
+parser.add_argument("-l", "--limit", help="limit on the length of evaluation set", type=int, default=10**9)
+parser.add_argument("-d", "--data_type", help="one of train/dev/test", type=str, default="dev")
 args = parser.parse_args()
 
 if __name__ == "__main__":
     dataset = CDRData()
 
-    data_path = ""
+    data_path = dataset.DEV_DATA_PATH
     if args.data_type == "dev":
         data_path = dataset.DEV_DATA_PATH
     elif args.data_type == "train":
