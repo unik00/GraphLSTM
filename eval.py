@@ -13,11 +13,13 @@ if __name__ == "__main__":
     model = GraphLSTM(dataset)
 
     model.load_weights("saved_weights/saved")
-    dev_data = dataset.build_data_from_file(dataset.DEV_DATA_PATH, mode='intra', limit=1000)
+    dev_data = dataset.build_data_from_file(dataset.TRAIN_DATA_PATH, mode='intra', limit=None)
     random.shuffle(dev_data)
 
     all_pred = list()
     all_golden = list()
+
+    batch_size = 1
 
     for step, x_dev in enumerate(dev_data):
         if len(x_dev['Chemical']) == 0 or len(x_dev['Disease']) == 0:
@@ -25,13 +27,17 @@ if __name__ == "__main__":
 
         y_dev = make_golden(x_dev)
 
-        with tf.GradientTape() as tape:
-            logits = model(x_dev)
-            logits = make_tensor_from_dict(logits)
+        logits = model(x_dev)
+        logits = make_tensor_from_dict(logits)
 
-        all_pred += [tf.math.argmax(logit[0]) for logit in logits]
-        # all_pred += [random.randint(0, 1) for logit in logits]
-        all_golden += [tf.math.argmax(golden[0]) for golden in y_dev]
+        all_pred += [int(tf.math.argmax(logit[0])) for logit in logits]
+        # all_pred += [1] * len(y_dev)
+        all_golden += [int(tf.math.argmax(golden[0])) for golden in y_dev]
+
+        if step % 10 == 0:
+            print("Seen so far: {}/{} samples".format((step + 1) * batch_size, len(dev_data)))
+
+    print("Finished inference.")
 
     model.summary()
     print(all_golden)
