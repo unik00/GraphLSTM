@@ -1,3 +1,5 @@
+import random
+
 import tensorflow as tf
 from sklearn.metrics import f1_score
 
@@ -11,7 +13,8 @@ if __name__ == "__main__":
     model = GraphLSTM(dataset)
 
     model.load_weights("saved_weights/saved")
-    dev_data = dataset.build_data_from_file(dataset.DEV_DATA_PATH, mode='intra', limit=200)
+    dev_data = dataset.build_data_from_file(dataset.DEV_DATA_PATH, mode='intra', limit=1000)
+    random.shuffle(dev_data)
 
     all_pred = list()
     all_golden = list()
