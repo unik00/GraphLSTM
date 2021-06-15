@@ -7,12 +7,13 @@ from graph_lstm import GraphLSTM
 
 def make_golden(input_dict):
     golden = list()
+
     for c in input_dict['Chemical']:
         for d in input_dict['Disease']:
             if (c, d) in input_dict['relation']:
-                golden.append([tf.constant([1., 0.])])
-            else:
                 golden.append([tf.constant([0., 1.])])
+            else:
+                golden.append([tf.constant([1., 0.])])
     return tf.convert_to_tensor(golden)
 
 
