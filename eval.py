@@ -8,12 +8,13 @@ from cdr_data import CDRData
 from graph_lstm import GraphLSTM
 from train import make_golden, make_tensor_from_dict
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-l", "--limit", help="limit on the length of evaluation set", type=int, default=10**9)
-parser.add_argument("-d", "--data_type", help="one of train/dev/test", type=str, default="dev")
-args = parser.parse_args()
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-l", "--limit", help="limit on the length of evaluation set", type=int, default=10 ** 9)
+    parser.add_argument("-d", "--data_type", help="one of train/dev/test", type=str, default="dev")
+    args = parser.parse_args()
+
     dataset = CDRData()
 
     data_path = dataset.DEV_DATA_PATH
