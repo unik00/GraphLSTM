@@ -1,7 +1,7 @@
 import random
 
 import tensorflow as tf
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, accuracy_score
 
 from cdr_data import CDRData
 from graph_lstm import GraphLSTM
@@ -30,6 +30,7 @@ if __name__ == "__main__":
             logits = make_tensor_from_dict(logits)
 
         all_pred += [tf.math.argmax(logit[0]) for logit in logits]
+        # all_pred += [random.randint(0, 1) for logit in logits]
         all_golden += [tf.math.argmax(golden[0]) for golden in y_dev]
 
     model.summary()
@@ -37,4 +38,6 @@ if __name__ == "__main__":
     print(all_pred)
     print("micro f1: ", f1_score(all_golden, all_pred, average='micro'))
     print("macro f1: ", f1_score(all_golden, all_pred, average='macro'))
+    print("binary f1: ", f1_score(all_golden, all_pred, average='binary'))
+    print("acc: ", accuracy_score(all_golden, all_pred))
 
