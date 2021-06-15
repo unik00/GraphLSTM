@@ -28,11 +28,11 @@ if __name__ == "__main__":
     dataset = CDRData()
     model = GraphLSTM(dataset)
 
-    optimizer = tf.keras.optimizers.SGD(learning_rate=0.01)
+    optimizer = tf.keras.optimizers.Adadelta(learning_rate=0.1)
     loss_fn = tf.keras.losses.categorical_crossentropy
 
     start_time = time.time()
-    train_data = dataset.build_data_from_file(dataset.TRAIN_DATA_PATH, mode='intra')
+    train_data = dataset.build_data_from_file(dataset.TRAIN_DATA_PATH, mode='intra', limit=None)
     print("Length train data: ", len(train_data))
 
     print("Load data time: ", time.time() - start_time)

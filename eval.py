@@ -13,7 +13,7 @@ if __name__ == "__main__":
     model = GraphLSTM(dataset)
 
     model.load_weights("saved_weights/saved")
-    dev_data = dataset.build_data_from_file(dataset.TRAIN_DATA_PATH, mode='intra', limit=None)
+    dev_data = dataset.build_data_from_file(dataset.TRAIN_DATA_PATH, mode='intra', limit=100)
     random.shuffle(dev_data)
 
     all_pred = list()
@@ -39,11 +39,11 @@ if __name__ == "__main__":
 
     print("Finished inference.")
 
-    model.summary()
+    # model.summary()
     print(all_golden)
     print(all_pred)
     print("micro f1: ", f1_score(all_golden, all_pred, average='micro'))
     print("macro f1: ", f1_score(all_golden, all_pred, average='macro'))
-    print("binary f1: ", f1_score(all_golden, all_pred, average='binary'))
     print("acc: ", accuracy_score(all_golden, all_pred))
+    print("binary f1: ", f1_score(all_golden, all_pred, average='binary'))
 
