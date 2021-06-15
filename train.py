@@ -32,6 +32,7 @@ if __name__ == "__main__":
 
     start_time = time.time()
     train_data = dataset.build_data_from_file(dataset.TRAIN_DATA_PATH, mode='intra')
+    print("Length train data: ", len(train_data))
 
     print("Load data time: ", time.time() - start_time)
 
@@ -59,7 +60,7 @@ if __name__ == "__main__":
 
             optimizer.apply_gradients(zip(grads, model.trainable_weights))
 
-            if step % 1 == 0:
+            if step % 10 == 0:
                 print(
                     "Training loss (for one batch) at step {}: {}".format(step, tf.norm(loss_value))
                 )

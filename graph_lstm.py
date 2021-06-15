@@ -18,11 +18,10 @@ class CNNCharEmbedding(Layer):
 
     def __init__(self, char_dict):
         super().__init__(char_dict)
-        # TODO: keras Hyperband tuner
 
         self.char_dict = char_dict
 
-        self.chars_emb = Embedding(len(self.char_dict), self.CHAR_DIM, input_length=self.PADDED_LENGTH)
+        self.chars_emb = Embedding(len(self.char_dict) + 1, self.CHAR_DIM, input_length=self.PADDED_LENGTH)
         self.conv = Conv2D(kernel_size=(self.CONV_SIZE, self.CHAR_DIM),
                            strides=(1, self.CHAR_DIM),
                            filters=self.NUM_FILTERS)
