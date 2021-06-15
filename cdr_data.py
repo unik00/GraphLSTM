@@ -36,7 +36,6 @@ def build_inter_sentence_docs_from_file(path, limit=None):
             - "relation": a set of pairs (chemical, disease) denoting one CID relation
     """
     ret = list()
-
     with open(path, 'rb') as fp:
         reader = bioc.BioCXMLDocumentReader(fp)
 
@@ -46,6 +45,10 @@ def build_inter_sentence_docs_from_file(path, limit=None):
             current_dict['Chemical'] = dict()
 
             for passage in document.passages:
+
+                # if passage.infons.get("type") == "title": TODO: ask for elaboration
+                #     continue
+
                 assert len(passage.relations) == 0
                 doc = gen_dependency_tree(passage.text)
                 current_dict['doc'] = doc
@@ -83,7 +86,6 @@ def build_inter_sentence_docs_from_file(path, limit=None):
                 assert relation.infons.get("relation") == "CID"
                 current_dict["relation"].add((relation.infons.get("Chemical"),
                                               relation.infons.get("Disease")))
-
             ret.append(current_dict)
             if limit is not None and len(ret) == limit:
                 return ret
