@@ -1,4 +1,5 @@
 import random
+import argparse
 
 import tensorflow as tf
 from sklearn.metrics import f1_score, accuracy_score
@@ -7,13 +8,25 @@ from cdr_data import CDRData
 from graph_lstm import GraphLSTM
 from train import make_golden, make_tensor_from_dict
 
+parser = argparse.ArgumentParser()
+parser.add_argument("-l", "--limit", help="limit on the evalation set", type=int)
+parser.add_argument("-d", "--data_type", help="one of train/dev/test", type=str)
+args = parser.parse_args()
 
 if __name__ == "__main__":
     dataset = CDRData()
+
+    data_path = ""
+    if args.data_type == "dev":
+        data_path = dataset.DEV_DATA_PATH
+    elif args.data_type == "train":
+        data_path = dataset.TRAIN_DATA_PATH
+
     model = GraphLSTM(dataset)
 
     model.load_weights("saved_weights/saved")
-    dev_data = dataset.build_data_from_file(dataset.TRAIN_DATA_PATH, mode='intra', limit=100)
+
+    dev_data = dataset.build_data_from_file(data_path, mode='intra', limit=args.limit)
     random.shuffle(dev_data)
 
     all_pred = list()
