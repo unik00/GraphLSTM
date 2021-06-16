@@ -14,7 +14,7 @@ class CNNCharEmbedding(Layer):
     PADDED_LENGTH = 100
     CONV_SIZE = 3
     NUM_FILTERS = 20
-    CHAR_DIM = 4
+    CHAR_DIM = 20
 
     def __init__(self, char_dict):
         super().__init__(char_dict)
@@ -79,7 +79,6 @@ class POSEmbedding(Layer):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.pos_map = get_universal_POS()
-
         self.POS_emb = Embedding(len(self.pos_map), self.EMB_DIM, input_length=1)
 
     def call(self, list_POSs: List[str]):
@@ -336,7 +335,8 @@ class ScoreLayer(Layer):
                 for i in range(len(list_c)):
                     for j in range(len(list_d)):
 
-                        emb = self.position_embedding(tf.math.abs(list_c[i][1] - list_d[j][1]))
+                        emb = self.position_embedding(min(abs(list_c[i][1] - list_d[j][1]),
+                                                          self.POSITION_EMBEDDING_IN_DIM - 1))
                         emb = tf.reshape(emb, [1, -1])
 
                         current = self.score(tf.concat((list_c[i][0], list_d[j][0], emb), axis=1))

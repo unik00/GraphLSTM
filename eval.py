@@ -1,4 +1,5 @@
 import random
+import argparse
 
 import tensorflow as tf
 from sklearn.metrics import f1_score, accuracy_score
@@ -9,11 +10,26 @@ from train import make_golden, make_tensor_from_dict
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-l", "--limit", help="limit on the length of evaluation set", type=int, default=10 ** 9)
+    parser.add_argument("-d", "--data_type", help="one of train/dev/test", type=str, default="dev")
+    args = parser.parse_args()
+
     dataset = CDRData()
+
+    data_path = dataset.DEV_DATA_PATH
+    if args.data_type == "dev":
+        data_path = dataset.DEV_DATA_PATH
+    elif args.data_type == "train":
+        data_path = dataset.TRAIN_DATA_PATH
+    elif args.data_type == "test":
+        data_path = dataset.TEST_DATA_PATH
+
     model = GraphLSTM(dataset)
 
     model.load_weights("saved_weights/saved")
-    dev_data = dataset.build_data_from_file(dataset.TRAIN_DATA_PATH, mode='intra', limit=None)
+
+    dev_data = dataset.build_data_from_file(data_path, mode='intra', limit=args.limit)
     random.shuffle(dev_data)
 
     all_pred = list()
@@ -39,11 +55,11 @@ if __name__ == "__main__":
 
     print("Finished inference.")
 
-    model.summary()
+    # model.summary()
     print(all_golden)
     print(all_pred)
     print("micro f1: ", f1_score(all_golden, all_pred, average='micro'))
     print("macro f1: ", f1_score(all_golden, all_pred, average='macro'))
-    print("binary f1: ", f1_score(all_golden, all_pred, average='binary'))
     print("acc: ", accuracy_score(all_golden, all_pred))
+    print("binary f1: ", f1_score(all_golden, all_pred, average='binary'))
 
