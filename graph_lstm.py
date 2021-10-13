@@ -7,7 +7,7 @@ from tensorflow.keras.layers import *
 
 from cdr_data import CDRData, normalize
 from emb_utils import *
-from graph_lstm_utils import AdjMatrixBuilder
+from graph_lstm_utils import AdjListBuilder
 
 
 class CNNCharEmbedding(Layer):
@@ -108,103 +108,103 @@ class ELMoEmbedding(Layer):
         return tf.convert_to_tensor(self.ELMoEmbedding(input_tensor)["elmo_representations"][0][0].tolist())
 
 
-class CalculateHLayer(Layer):
-    TRANSITION_STATE_OUTPUTS_DIM = 150
-
-    def __init__(self):
-        super(CalculateHLayer, self).__init__()
-
-    def call(self, unpreprocessed_unweight_adj_matrix, h):
-        """
-        Args:
-            input: a string denoting one single sentence
-            h: previous hidden state
-        """
-        leng_doc = h.shape[0]
-        # h: 13*150
-        unweight_adj_matrix = tf.reshape(unpreprocessed_unweight_adj_matrix, (leng_doc, leng_doc, 2, 1))
-        unweight_adj_matrix = tf.broadcast_to(unweight_adj_matrix, (leng_doc,
-                                                                    leng_doc,
-                                                                    2,
-                                                                    self.TRANSITION_STATE_OUTPUTS_DIM))
-
-        # matrix: 13*13*2*150
-        in_edge_repr = tf.identity(h)
-        in_edge_repr = tf.reshape(in_edge_repr, (leng_doc, 1, 1, self.TRANSITION_STATE_OUTPUTS_DIM))
-        in_edge_repr = tf.broadcast_to(in_edge_repr, (leng_doc,
-                                                      leng_doc,
-                                                      2,
-                                                      self.TRANSITION_STATE_OUTPUTS_DIM))
-        # in_edge_repr: 13*13*2*150 h(i, l)
-        h_in = tf.multiply(in_edge_repr, unweight_adj_matrix)
-        h_in = tf.reduce_sum(h_in, axis=(0, 2))
-
-        out_edge_repr = tf.identity(h)
-        out_edge_repr = tf.reshape(out_edge_repr, (1, leng_doc, 1, self.TRANSITION_STATE_OUTPUTS_DIM))
-        out_edge_repr = tf.broadcast_to(out_edge_repr, (leng_doc,
-                                                        leng_doc,
-                                                        2, self.TRANSITION_STATE_OUTPUTS_DIM))
-        # out_edge_repr: 13*13*2*150 h(j, l)
-        h_out = tf.multiply(out_edge_repr, unweight_adj_matrix)
-        h_out = tf.reduce_sum(h_out, axis=(1, 2))
-        # print(f'h out: {h_out}')
-        return h_in, h_out
-
-
-class CalculateSLayer(Layer):
-    def __init__(self, graph_builder):
-        super(CalculateSLayer, self).__init__()
-        self.graph_builder = graph_builder
-        self.dep_emb = Embedding(self.graph_builder.num_edge_type, GraphLSTM.DEP_EMB_DIM, input_length=1)
-        self.dep_tanh = Dense(GraphLSTM.DEP_EMB_DIM + GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM * 2,
-                              activation='tanh')
-
-    def call(self, matrix, unpreprocessed_unweight_adj_matrix, h):
-        """
-        Args:
-            input: a string denoting one single sentence
-            h: previous hidden state
-        """
-        # h: 13*60
-        leng_doc = matrix.shape[0]
-        # matrix: 13*13*2
-        # unpreprocessed_unweight_adj_matrix: 13*13*2
-
-        unweight_adj_matrix = tf.reshape(unpreprocessed_unweight_adj_matrix, (leng_doc, leng_doc, 2, 1))
-        unweight_adj_matrix = tf.broadcast_to(unweight_adj_matrix,
-                                              (leng_doc,
-                                               leng_doc,
-                                               2,
-                                               GraphLSTM.DEP_EMB_DIM + GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM * 2))
-        # unweight_adj_matrix: 13*13*2*70
-        embedded_matrix = self.dep_emb(matrix)
-        # embedded_matrix: 13*13*2*10
-        node_edge_h = tf.identity(h)
-        node_edge_h = tf.reshape(node_edge_h,
-                                 (leng_doc, 1, 1, 2 * GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM))
-        node_edge_h = tf.broadcast_to(node_edge_h,
-                                      (leng_doc, leng_doc, 2, 2 * GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM))
-        node_edge_repr = tf.concat((embedded_matrix, node_edge_h), axis=3)
-        node_edge_repr = tf.multiply(unweight_adj_matrix, node_edge_repr)
-        # node_edge_repr: 13*13*2*70
-        node_edge_repr = self.dep_tanh(node_edge_repr)
-        s_in = tf.reduce_sum(node_edge_repr, axis=(0, 2))
-
-        reversed_node_edge_h = tf.identity(h)
-        reversed_node_edge_h = tf.reshape(reversed_node_edge_h,
-                                          (1, leng_doc, 1, 2 * GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM))
-
-        reversed_node_edge_h = tf.broadcast_to(reversed_node_edge_h,
-                                               (leng_doc, leng_doc, 2, 2 * GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM))
-
-        reversed_node_edge_repr = tf.concat((embedded_matrix, reversed_node_edge_h), axis=3)
-        reversed_node_edge_repr = tf.multiply(unweight_adj_matrix, reversed_node_edge_repr)
-
-        # reversed_node_edge_repr: 13*13*2*70
-        reversed_node_edge_repr = self.dep_tanh(reversed_node_edge_repr)
-        s_out = tf.reduce_sum(reversed_node_edge_repr, axis=(1, 2))
-
-        return s_in, s_out
+# class CalculateHLayer(Layer):
+#     TRANSITION_STATE_OUTPUTS_DIM = 150
+#
+#     def __init__(self):
+#         super(CalculateHLayer, self).__init__()
+#
+#     def call(self, unpreprocessed_unweight_adj_matrix, h):
+#         """
+#         Args:
+#             input: a string denoting one single sentence
+#             h: previous hidden state
+#         """
+#         leng_doc = h.shape[0]
+#         # h: 13*150
+#         unweight_adj_matrix = tf.reshape(unpreprocessed_unweight_adj_matrix, (leng_doc, leng_doc, 2, 1))
+#         unweight_adj_matrix = tf.broadcast_to(unweight_adj_matrix, (leng_doc,
+#                                                                     leng_doc,
+#                                                                     2,
+#                                                                     self.TRANSITION_STATE_OUTPUTS_DIM))
+#
+#         # matrix: 13*13*2*150
+#         in_edge_repr = tf.identity(h)
+#         in_edge_repr = tf.reshape(in_edge_repr, (leng_doc, 1, 1, self.TRANSITION_STATE_OUTPUTS_DIM))
+#         in_edge_repr = tf.broadcast_to(in_edge_repr, (leng_doc,
+#                                                       leng_doc,
+#                                                       2,
+#                                                       self.TRANSITION_STATE_OUTPUTS_DIM))
+#         # in_edge_repr: 13*13*2*150 h(i, l)
+#         h_in = tf.multiply(in_edge_repr, unweight_adj_matrix)
+#         h_in = tf.reduce_sum(h_in, axis=(0, 2))
+#
+#         out_edge_repr = tf.identity(h)
+#         out_edge_repr = tf.reshape(out_edge_repr, (1, leng_doc, 1, self.TRANSITION_STATE_OUTPUTS_DIM))
+#         out_edge_repr = tf.broadcast_to(out_edge_repr, (leng_doc,
+#                                                         leng_doc,
+#                                                         2, self.TRANSITION_STATE_OUTPUTS_DIM))
+#         # out_edge_repr: 13*13*2*150 h(j, l)
+#         h_out = tf.multiply(out_edge_repr, unweight_adj_matrix)
+#         h_out = tf.reduce_sum(h_out, axis=(1, 2))
+#         # print(f'h out: {h_out}')
+#         return h_in, h_out
+#
+#
+# class CalculateSLayer(Layer):
+#     def __init__(self, graph_builder):
+#         super(CalculateSLayer, self).__init__()
+#         self.graph_builder = graph_builder
+#         self.dep_emb = Embedding(self.graph_builder.num_edge_type, GraphLSTM.DEP_EMB_DIM, input_length=1)
+#         self.dep_tanh = Dense(GraphLSTM.DEP_EMB_DIM + GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM * 2,
+#                               activation='tanh')
+#
+#     def call(self, matrix, unpreprocessed_unweight_adj_matrix, h):
+#         """
+#         Args:
+#             input: a string denoting one single sentence
+#             h: previous hidden state
+#         """
+#         # h: 13*60
+#         leng_doc = matrix.shape[0]
+#         # matrix: 13*13*2
+#         # unpreprocessed_unweight_adj_matrix: 13*13*2
+#
+#         unweight_adj_matrix = tf.reshape(unpreprocessed_unweight_adj_matrix, (leng_doc, leng_doc, 2, 1))
+#         unweight_adj_matrix = tf.broadcast_to(unweight_adj_matrix,
+#                                               (leng_doc,
+#                                                leng_doc,
+#                                                2,
+#                                                GraphLSTM.DEP_EMB_DIM + GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM * 2))
+#         # unweight_adj_matrix: 13*13*2*70
+#         embedded_matrix = self.dep_emb(matrix)
+#         # embedded_matrix: 13*13*2*10
+#         node_edge_h = tf.identity(h)
+#         node_edge_h = tf.reshape(node_edge_h,
+#                                  (leng_doc, 1, 1, 2 * GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM))
+#         node_edge_h = tf.broadcast_to(node_edge_h,
+#                                       (leng_doc, leng_doc, 2, 2 * GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM))
+#         node_edge_repr = tf.concat((embedded_matrix, node_edge_h), axis=3)
+#         node_edge_repr = tf.multiply(unweight_adj_matrix, node_edge_repr)
+#         # node_edge_repr: 13*13*2*70
+#         node_edge_repr = self.dep_tanh(node_edge_repr)
+#         s_in = tf.reduce_sum(node_edge_repr, axis=(0, 2))
+#
+#         reversed_node_edge_h = tf.identity(h)
+#         reversed_node_edge_h = tf.reshape(reversed_node_edge_h,
+#                                           (1, leng_doc, 1, 2 * GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM))
+#
+#         reversed_node_edge_h = tf.broadcast_to(reversed_node_edge_h,
+#                                                (leng_doc, leng_doc, 2, 2 * GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM))
+#
+#         reversed_node_edge_repr = tf.concat((embedded_matrix, reversed_node_edge_h), axis=3)
+#         reversed_node_edge_repr = tf.multiply(unweight_adj_matrix, reversed_node_edge_repr)
+#
+#         # reversed_node_edge_repr: 13*13*2*70
+#         reversed_node_edge_repr = self.dep_tanh(reversed_node_edge_repr)
+#         s_out = tf.reduce_sum(reversed_node_edge_repr, axis=(1, 2))
+#
+#         return s_in, s_out
 
 
 class CustomizeLSTMCell(Layer):
@@ -350,7 +350,72 @@ class ScoreLayer(Layer):
         return output
 
 
+class SCalculator(Layer):
+    def __init__(self):
+        super(SCalculator, self).__init__()
+        self.graph_builder = AdjListBuilder()
+        self.edge_emb = Embedding(self.graph_builder.num_edge_type, GraphLSTM.DEP_EMB_DIM, input_length=1)
+        self.edge_tanh = Dense(GraphLSTM.DEP_EMB_DIM + GraphLSTM. BI_LSTM_PHASE_1_OUTPUT_DIM * 2,
+                               activation='tanh')
+        self.output_dimension = GraphLSTM.DEP_EMB_DIM + GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM * 2
+
+    def __call__(self, adj_list, bi_lstm_output):
+        length_doc = bi_lstm_output.shape[0]
+        s_in = [tf.zeros(self.output_dimension, dtype=tf.float32) for _ in range(length_doc)]
+        s_out = [tf.zeros(self.output_dimension, dtype=tf.float32) for _ in range(length_doc)]
+
+        for node_out in range(len(adj_list)):
+            for node_in, type_of_edge in adj_list[node_out]:
+                edge_type_embed = self.edge_emb(type_of_edge)
+
+                hidden_state_node_in = bi_lstm_output[node_in, :]
+                hidden_state_node_out = bi_lstm_output[node_out, :]
+
+                edge_in_repr = tf.concat((edge_type_embed, hidden_state_node_out), axis=0)
+                edge_out_repr = tf.concat((edge_type_embed, hidden_state_node_in), axis=0)
+
+                edge_in_repr = self.edge_tanh(tf.reshape(edge_in_repr, (1, -1)))
+                edge_out_repr = self.edge_tanh(tf.reshape(edge_out_repr, (1, -1)))
+
+                edge_in_repr = tf.reshape(edge_in_repr, shape=(-1))
+                edge_out_repr = tf.reshape(edge_out_repr, shape=(-1))
+
+                s_in[node_in] += edge_in_repr
+                s_out[node_out] += edge_out_repr
+        s_in = tf.convert_to_tensor(s_in)
+        s_out = tf.convert_to_tensor(s_out)
+        return s_in, s_out
+
+
+class HCalculator(Layer):
+    def __init__(self):
+        super(HCalculator, self).__init__()
+
+    def __call__(self, adj_list, h):
+        length_doc = h.shape[0]
+        hidden_state_dim = h.shape[1]
+        h_in = [tf.zeros((hidden_state_dim,), dtype=tf.float32) for _ in range(length_doc)]
+        h_out = [tf.zeros((hidden_state_dim,), dtype=tf.float32) for _ in range(length_doc)]
+
+        for node_out in range(length_doc):
+            for node_in, edge_type in adj_list[node_out]:
+                hidden_state_node_in = h[node_in, :]
+                hidden_state_node_out = h[node_out, :]
+
+                h_in[node_in] += hidden_state_node_out
+                h_out[node_out] += hidden_state_node_in
+
+        h_in = tf.convert_to_tensor(h_in)
+        h_out = tf.convert_to_tensor(h_out)
+        print(h_in.shape)
+        print(h_out.shape)
+        return h_in, h_out
+
+
 class GraphLSTM(tf.keras.Model):
+    def get_config(self):
+        pass
+
     BI_LSTM_PHASE_1_OUTPUT_DIM = 30
     DEP_EMB_DIM = 10
     TRANSITION_STEP = 6
@@ -369,10 +434,10 @@ class GraphLSTM(tf.keras.Model):
                                            return_sequences=True,
                                            return_state=False))
 
-        self.graph_builder = AdjMatrixBuilder()
+        self.graph_builder = AdjListBuilder()
 
-        self.s_calculator = CalculateSLayer(self.graph_builder)
-        self.h_calculator = CalculateHLayer()
+        self.s_calculator = SCalculator()
+        self.h_calculator = HCalculator()
         self.state_transition = CustomizeLSTMCell()
         self.score_layer = ScoreLayer()
 
@@ -406,9 +471,9 @@ class GraphLSTM(tf.keras.Model):
         # TODO: padding before inference?
         doc = input_dict['doc']
 
-        matrix = self.graph_builder(doc)
-        unpreprocessed_unweight_adj_matrix = self.graph_builder(doc, return_weighted=False)
-
+        # matrix = self.graph_builder(doc)
+        # unpreprocessed_unweight_adj_matrix = self.graph_builder(doc, return_weighted=False)
+        adj_list = self.graph_builder(doc)
         emb = self.emb_single(doc)  # embedding layer
 
         emb = tf.expand_dims(emb, axis=0)
@@ -417,19 +482,22 @@ class GraphLSTM(tf.keras.Model):
 
         bi_lstm_output = tf.identity(emb)
         bi_lstm_output = tf.reshape(bi_lstm_output, (bi_lstm_output.shape[1], bi_lstm_output.shape[2]))
-        s_in, s_out = self.s_calculator(matrix, unpreprocessed_unweight_adj_matrix, bi_lstm_output)
+        # print(bi_lstm_output.shape)
+        s_in, s_out = self.s_calculator(adj_list, bi_lstm_output)
         initial_h = tf.constant(np.zeros((len(doc), CustomizeLSTMCell.TRANSITION_STATE_OUTPUTS_DIM)), dtype=tf.float32)
         initial_c = tf.constant(np.zeros((len(doc), CustomizeLSTMCell.TRANSITION_STATE_OUTPUTS_DIM)), dtype=tf.float32)
         h_history = [initial_h]
         c_history = [initial_c]
         for step in range(self.TRANSITION_STEP):
-            h_in, h_out = self.h_calculator(unpreprocessed_unweight_adj_matrix, h_history[-1])
+            h_in, h_out = self.h_calculator(adj_list, h_history[-1])
             h, c = self.state_transition(s_in, s_out, h_in, h_out, c_history[-1])
             h_history.append(h)
             c_history.append(c)
+            break
 
         output = self.score_layer(h_history[-1], input_dict)
         return output
+        return
 
 
 if __name__ == "__main__":
