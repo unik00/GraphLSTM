@@ -108,105 +108,6 @@ class ELMoEmbedding(Layer):
         return tf.convert_to_tensor(self.ELMoEmbedding(input_tensor)["elmo_representations"][0][0].tolist())
 
 
-# class CalculateHLayer(Layer):
-#     TRANSITION_STATE_OUTPUTS_DIM = 150
-#
-#     def __init__(self):
-#         super(CalculateHLayer, self).__init__()
-#
-#     def call(self, unpreprocessed_unweight_adj_matrix, h):
-#         """
-#         Args:
-#             input: a string denoting one single sentence
-#             h: previous hidden state
-#         """
-#         leng_doc = h.shape[0]
-#         # h: 13*150
-#         unweight_adj_matrix = tf.reshape(unpreprocessed_unweight_adj_matrix, (leng_doc, leng_doc, 2, 1))
-#         unweight_adj_matrix = tf.broadcast_to(unweight_adj_matrix, (leng_doc,
-#                                                                     leng_doc,
-#                                                                     2,
-#                                                                     self.TRANSITION_STATE_OUTPUTS_DIM))
-#
-#         # matrix: 13*13*2*150
-#         in_edge_repr = tf.identity(h)
-#         in_edge_repr = tf.reshape(in_edge_repr, (leng_doc, 1, 1, self.TRANSITION_STATE_OUTPUTS_DIM))
-#         in_edge_repr = tf.broadcast_to(in_edge_repr, (leng_doc,
-#                                                       leng_doc,
-#                                                       2,
-#                                                       self.TRANSITION_STATE_OUTPUTS_DIM))
-#         # in_edge_repr: 13*13*2*150 h(i, l)
-#         h_in = tf.multiply(in_edge_repr, unweight_adj_matrix)
-#         h_in = tf.reduce_sum(h_in, axis=(0, 2))
-#
-#         out_edge_repr = tf.identity(h)
-#         out_edge_repr = tf.reshape(out_edge_repr, (1, leng_doc, 1, self.TRANSITION_STATE_OUTPUTS_DIM))
-#         out_edge_repr = tf.broadcast_to(out_edge_repr, (leng_doc,
-#                                                         leng_doc,
-#                                                         2, self.TRANSITION_STATE_OUTPUTS_DIM))
-#         # out_edge_repr: 13*13*2*150 h(j, l)
-#         h_out = tf.multiply(out_edge_repr, unweight_adj_matrix)
-#         h_out = tf.reduce_sum(h_out, axis=(1, 2))
-#         # print(f'h out: {h_out}')
-#         return h_in, h_out
-#
-#
-# class CalculateSLayer(Layer):
-#     def __init__(self, graph_builder):
-#         super(CalculateSLayer, self).__init__()
-#         self.graph_builder = graph_builder
-#         self.dep_emb = Embedding(self.graph_builder.num_edge_type, GraphLSTM.DEP_EMB_DIM, input_length=1)
-#         self.dep_tanh = Dense(GraphLSTM.DEP_EMB_DIM + GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM * 2,
-#                               activation='tanh')
-#
-#     def call(self, matrix, unpreprocessed_unweight_adj_matrix, h):
-#         """
-#         Args:
-#             input: a string denoting one single sentence
-#             h: previous hidden state
-#         """
-#         # h: 13*60
-#         leng_doc = matrix.shape[0]
-#         # matrix: 13*13*2
-#         # unpreprocessed_unweight_adj_matrix: 13*13*2
-#
-#         unweight_adj_matrix = tf.reshape(unpreprocessed_unweight_adj_matrix, (leng_doc, leng_doc, 2, 1))
-#         unweight_adj_matrix = tf.broadcast_to(unweight_adj_matrix,
-#                                               (leng_doc,
-#                                                leng_doc,
-#                                                2,
-#                                                GraphLSTM.DEP_EMB_DIM + GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM * 2))
-#         # unweight_adj_matrix: 13*13*2*70
-#         embedded_matrix = self.dep_emb(matrix)
-#         # embedded_matrix: 13*13*2*10
-#         node_edge_h = tf.identity(h)
-#         node_edge_h = tf.reshape(node_edge_h,
-#                                  (leng_doc, 1, 1, 2 * GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM))
-#         node_edge_h = tf.broadcast_to(node_edge_h,
-#                                       (leng_doc, leng_doc, 2, 2 * GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM))
-#         node_edge_repr = tf.concat((embedded_matrix, node_edge_h), axis=3)
-#         node_edge_repr = tf.multiply(unweight_adj_matrix, node_edge_repr)
-#         # node_edge_repr: 13*13*2*70
-#         node_edge_repr = self.dep_tanh(node_edge_repr)
-#         s_in = tf.reduce_sum(node_edge_repr, axis=(0, 2))
-#
-#         reversed_node_edge_h = tf.identity(h)
-#         reversed_node_edge_h = tf.reshape(reversed_node_edge_h,
-#                                           (1, leng_doc, 1, 2 * GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM))
-#
-#         reversed_node_edge_h = tf.broadcast_to(reversed_node_edge_h,
-#                                                (leng_doc, leng_doc, 2, 2 * GraphLSTM.BI_LSTM_PHASE_1_OUTPUT_DIM))
-#
-#         reversed_node_edge_repr = tf.concat((embedded_matrix, reversed_node_edge_h), axis=3)
-#         reversed_node_edge_repr = tf.multiply(unweight_adj_matrix, reversed_node_edge_repr)
-#
-#         # reversed_node_edge_repr: 13*13*2*70
-#         reversed_node_edge_repr = self.dep_tanh(reversed_node_edge_repr)
-#         s_out = tf.reduce_sum(reversed_node_edge_repr, axis=(1, 2))
-#
-#         return s_in, s_out
-
-
 class CustomizeLSTMCell(Layer):
     TRANSITION_STATE_OUTPUTS_DIM = 150
 
@@ -407,8 +308,6 @@ class HCalculator(Layer):
 
         h_in = tf.convert_to_tensor(h_in)
         h_out = tf.convert_to_tensor(h_out)
-        print(h_in.shape)
-        print(h_out.shape)
         return h_in, h_out
 
 
