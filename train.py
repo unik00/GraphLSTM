@@ -30,12 +30,15 @@ if __name__ == "__main__":
     parser.add_argument("-e", "--epochs", help="number of epoch", type=int, default=20)
     parser.add_argument("-l", "--limit", help="limit on the length of train set", type=int, default=10 ** 9)
     parser.add_argument("-b", "--batch_size", help="batch size", type=int, default=1)
+    parser.add_argument("-f", "--from_pretrained", help="load pretrained weights", type=bool, default=False)
 
     train_args = parser.parse_args()
 
     dataset = CDRData()
     model = GraphLSTM(dataset)
-    model.load_weights("saved_weights/saved")
+
+    if train_args.from_pretrained:
+        model.load_weights("saved_weights/saved")
 
     optimizer = tf.keras.optimizers.Adadelta(learning_rate=0.1)
     loss_fn = tf.keras.losses.categorical_crossentropy
