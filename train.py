@@ -40,7 +40,7 @@ if __name__ == "__main__":
     loss_fn = tf.keras.losses.categorical_crossentropy
 
     start_time = time.time()
-    train_data = dataset.build_data_from_file(dataset.TRAIN_DATA_PATH, mode='intra', limit=train_args.limit)
+    train_data = dataset.build_data_from_file(dataset.TRAIN_DATA_PATH, mode='inter', limit=train_args.limit)
     print("Length train data: ", len(train_data))
 
     print("Load data time: ", time.time() - start_time)
