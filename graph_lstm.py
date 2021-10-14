@@ -12,9 +12,9 @@ from graph_lstm_utils import AdjListBuilder
 
 class CNNCharEmbedding(Layer):
     PADDED_LENGTH = 100
-    CONV_SIZE = 3
-    NUM_FILTERS = 20
-    CHAR_DIM = 20
+    CONV_SIZE = 5
+    NUM_FILTERS = 30
+    CHAR_DIM = 30
 
     def __init__(self, char_dict):
         super().__init__(char_dict)
