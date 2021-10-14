@@ -35,6 +35,7 @@ if __name__ == "__main__":
 
     dataset = CDRData()
     model = GraphLSTM(dataset)
+    model.load_weights("saved_weights/saved")
 
     optimizer = tf.keras.optimizers.Adadelta(learning_rate=0.1)
     loss_fn = tf.keras.losses.categorical_crossentropy
