@@ -45,7 +45,7 @@ if __name__ == "__main__":
     if train_args.from_pretrained:
         model.load_weights("saved_weights/saved")
 
-    optimizer = tf.keras.optimizers.Adadelta(learning_rate=train_args.learning_rate)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=train_args.learning_rate)
     # loss_fn = tf.keras.losses.categorical_crossentropy
 
     start_time = time.time()
