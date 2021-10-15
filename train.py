@@ -74,15 +74,14 @@ if __name__ == "__main__":
             # print(model.trainable_weights)
 
             optimizer.apply_gradients(zip(grads, model.trainable_weights))
+            all_pred += [int(tf.math.argmax(logit[0])) for logit in logits]
+            all_golden += [int(tf.math.argmax(golden[0])) for golden in y_train]
 
             if step % 10 == 9 or step == len(train_data) - 1:
-                all_pred += [int(tf.math.argmax(logit[0])) for logit in logits]
-                all_golden += [int(tf.math.argmax(golden[0])) for golden in y_train]
                 print(
-                    "Training loss (for one batch) at step {}: {}".format(step, tf.norm(loss_value))
+                    "Training loss (for one batch) at step {}: {}".format(step + 1, tf.norm(loss_value))
                 )
                 print("Seen so far: %s samples" % ((step + 1) * train_args.batch_size))
-
                 print("binary f1: ", f1_score(all_golden, all_pred, average='binary'))
 
             if step % 100 == 99 or step == len(train_data) - 1:
