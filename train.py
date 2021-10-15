@@ -32,7 +32,7 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--limit", help="limit on the length of train set", type=int, default=10 ** 9)
     parser.add_argument("-b", "--batch_size", help="batch size", type=int, default=1)
     parser.add_argument("-f", "--from_pretrained", help="load pretrained weights", type=bool, default=False)
-    parser.add_argument("-lr", "--learning_rate", help="learning rate", type=float, default=1e-5)
+    parser.add_argument("-lr", "--learning_rate", help="learning rate", type=float, default=0.001)
 
     train_args = parser.parse_args()
 
@@ -45,7 +45,7 @@ if __name__ == "__main__":
         model.load_weights("saved_weights/saved")
 
     optimizer = tf.keras.optimizers.Adadelta(learning_rate=train_args.learning_rate)
-    loss_fn = tf.keras.losses.categorical_crossentropy
+    # loss_fn = tf.keras.losses.categorical_crossentropy
 
     start_time = time.time()
     train_data = dataset.build_data_from_file(dataset.TRAIN_DATA_PATH, mode='inter', limit=train_args.limit)
@@ -70,7 +70,7 @@ if __name__ == "__main__":
                 logits = make_tensor_from_dict(logits)
 
                 # print("logits: ", logits, y_train)
-                loss_value = loss_fn(y_train, logits)
+                loss_value = tf.nn.weighted_cross_entropy_with_logits(y_train, logits, pos_weight=4.0)
 
             grads = tape.gradient(loss_value, model.trainable_weights)
             # print(model.trainable_weights)
