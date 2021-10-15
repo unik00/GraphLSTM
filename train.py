@@ -1,6 +1,7 @@
 import argparse
 import time
 import tensorflow as tf
+from sklearn.metrics import f1_score
 
 from cdr_data import CDRData
 from graph_lstm import GraphLSTM
@@ -31,8 +32,9 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--limit", help="limit on the length of train set", type=int, default=10 ** 9)
     parser.add_argument("-b", "--batch_size", help="batch size", type=int, default=1)
     parser.add_argument("-f", "--from_pretrained", help="load pretrained weights", type=bool, default=False)
-
     train_args = parser.parse_args()
+
+    print("Arguments: ", train_args)
 
     dataset = CDRData()
     model = GraphLSTM(dataset)
@@ -52,6 +54,9 @@ if __name__ == "__main__":
     for epoch in range(train_args.epochs):
         print("\nStart of epoch %d" % (epoch,))
 
+        all_pred = list()
+        all_golden = list()
+
         for step, x_train in enumerate(train_data):
             if len(x_train['Chemical']) == 0 or len(x_train['Disease']) == 0:
                 continue
@@ -70,10 +75,16 @@ if __name__ == "__main__":
 
             optimizer.apply_gradients(zip(grads, model.trainable_weights))
 
-            if step % 10 == 0:
+            if step % 10 == 9 or step == len(train_data) - 1:
+                all_pred += [int(tf.math.argmax(logit[0])) for logit in logits]
+                all_golden += [int(tf.math.argmax(golden[0])) for golden in y_train]
                 print(
                     "Training loss (for one batch) at step {}: {}".format(step, tf.norm(loss_value))
                 )
                 print("Seen so far: %s samples" % ((step + 1) * train_args.batch_size))
-        model.save_weights("saved_weights/saved")
+
+                print("binary f1: ", f1_score(all_golden, all_pred, average='binary'))
+
+            if step % 100 == 99 or step == train_args.epochs - 1:
+                model.save_weights("saved_weights/saved")
 
