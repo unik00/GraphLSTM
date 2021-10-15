@@ -85,6 +85,6 @@ if __name__ == "__main__":
 
                 print("binary f1: ", f1_score(all_golden, all_pred, average='binary'))
 
-            if step % 100 == 99 or step == train_args.epochs - 1:
+            if step % 100 == 99 or step == len(train_data) - 1:
                 model.save_weights("saved_weights/saved")
 
