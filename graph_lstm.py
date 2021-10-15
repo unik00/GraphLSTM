@@ -407,8 +407,8 @@ class HCalculator(Layer):
 
         h_in = tf.convert_to_tensor(h_in)
         h_out = tf.convert_to_tensor(h_out)
-        print(h_in.shape)
-        print(h_out.shape)
+        # print(h_in.shape)
+        # print(h_out.shape)
         return h_in, h_out
 
 

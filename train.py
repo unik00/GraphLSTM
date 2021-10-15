@@ -71,5 +71,8 @@ if __name__ == "__main__":
                     "Training loss (for one batch) at step {}: {}".format(step, tf.norm(loss_value))
                 )
                 print("Seen so far: %s samples" % ((step + 1) * train_args.batch_size))
+
+            if step % 100 == 99:
+                model.save_weights("saved_weights/saved")
         model.save_weights("saved_weights/saved")
 
