@@ -32,6 +32,8 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--limit", help="limit on the length of train set", type=int, default=10 ** 9)
     parser.add_argument("-b", "--batch_size", help="batch size", type=int, default=1)
     parser.add_argument("-f", "--from_pretrained", help="load pretrained weights", type=bool, default=False)
+    parser.add_argument("-lr", "--learning_rate", help="learning rate", type=float, default=1e-5)
+
     train_args = parser.parse_args()
 
     print("Arguments: ", train_args)
@@ -42,7 +44,7 @@ if __name__ == "__main__":
     if train_args.from_pretrained:
         model.load_weights("saved_weights/saved")
 
-    optimizer = tf.keras.optimizers.Adadelta(learning_rate=0.1)
+    optimizer = tf.keras.optimizers.Adadelta(learning_rate=train_args.learning_rate)
     loss_fn = tf.keras.losses.categorical_crossentropy
 
     start_time = time.time()
