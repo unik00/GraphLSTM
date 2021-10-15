@@ -84,6 +84,8 @@ if __name__ == "__main__":
                 print("Seen so far: %s samples" % ((step + 1) * train_args.batch_size))
                 print("binary f1: ", f1_score(all_golden, all_pred, average='binary'))
                 print("acc: ", accuracy_score(all_golden, all_pred))
+                print("Golden: ", all_golden)
+                print("Pred: ", all_pred)
 
             if step % 100 == 99 or step == len(train_data) - 1:
                 model.save_weights("saved_weights/saved")
