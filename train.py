@@ -1,5 +1,7 @@
 import argparse
 import time
+import random
+
 import tensorflow as tf
 
 from cdr_data import CDRData
@@ -52,6 +54,8 @@ if __name__ == "__main__":
     print("Load data time: ", time.time() - start_time)
 
     for epoch in range(train_args.epochs):
+        random.shuffle(train_data)
+
         print("\nStart of epoch %d" % (epoch,))
 
         for step, x_train in enumerate(train_data):
