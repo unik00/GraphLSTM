@@ -72,7 +72,7 @@ if __name__ == "__main__":
 
             optimizer.apply_gradients(zip(grads, model.trainable_weights))
 
-            if step % 10 == 0:
+            if step % 1 == 0:
                 print(
                     "Training loss (for one batch) at step {}: {}".format(step, tf.norm(loss_value))
                 )
