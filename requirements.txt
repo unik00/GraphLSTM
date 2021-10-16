@@ -1,5 +1,5 @@
 scispacy~=0.4.0
-tensorflow~=2.5.0rc1
+tensorflow~=2.4.0
 spacy~=3.0.5
 numpy~=1.19.4
 allennlp~=2.4.0

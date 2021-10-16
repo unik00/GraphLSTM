@@ -29,7 +29,7 @@ if __name__ == "__main__":
 
     model.load_weights("saved_weights/saved")
 
-    dev_data = dataset.build_data_from_file(data_path, mode='intra', limit=args.limit)
+    dev_data = dataset.build_data_from_file(data_path, mode='inter', limit=1000000000)
     random.shuffle(dev_data)
 
     all_pred = list()
@@ -38,6 +38,8 @@ if __name__ == "__main__":
     batch_size = 1
 
     for step, x_dev in enumerate(dev_data):
+        if step == args.limit:
+            break
         if len(x_dev['Chemical']) == 0 or len(x_dev['Disease']) == 0:
             continue
 
@@ -51,7 +53,7 @@ if __name__ == "__main__":
         all_golden += [int(tf.math.argmax(golden[0])) for golden in y_dev]
 
         if step % 10 == 0:
-            print("Seen so far: {}/{} samples".format((step + 1) * batch_size, len(dev_data)))
+            print("Seen so far: {}/{} samples".format((step + 1) * batch_size, min(args.limit, len(dev_data))))
 
     print("Finished inference.")
 
@@ -61,5 +63,5 @@ if __name__ == "__main__":
     print("micro f1: ", f1_score(all_golden, all_pred, average='micro'))
     print("macro f1: ", f1_score(all_golden, all_pred, average='macro'))
     print("acc: ", accuracy_score(all_golden, all_pred))
-    print("binary f1: ", f1_score(all_golden, all_pred, average='binary'))
+    print("binary f1 (final score): ", f1_score(all_golden, all_pred, average='binary'))
 
