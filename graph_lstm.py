@@ -12,9 +12,9 @@ from graph_lstm_utils import AdjListBuilder
 
 class CNNCharEmbedding(Layer):
     PADDED_LENGTH = 100
-    CONV_SIZE = 3
-    NUM_FILTERS = 20
-    CHAR_DIM = 20
+    CONV_SIZE = 5
+    NUM_FILTERS = 30
+    CHAR_DIM = 30
 
     def __init__(self, char_dict):
         super().__init__(char_dict)
@@ -286,10 +286,10 @@ class CustomizeLSTMCell(Layer):
 class ScoreLayer(Layer):
     """ Given hidden node states, calculate the relation score between given Chemical and Disease"""
 
-    REDUCED_C_DIM = 20
-    REDUCED_D_DIM = 21
-    POSITION_EMBEDDING_IN_DIM = 100
-    POSITION_EMBEDDING_OUT_DIM = 30
+    REDUCED_C_DIM = 100
+    REDUCED_D_DIM = 100
+    POSITION_EMBEDDING_IN_DIM = 600
+    POSITION_EMBEDDING_OUT_DIM = 50
     SCORE_DIM = 2
 
     def __init__(self):
@@ -416,7 +416,7 @@ class GraphLSTM(tf.keras.Model):
     def get_config(self):
         pass
 
-    BI_LSTM_PHASE_1_OUTPUT_DIM = 30
+    BI_LSTM_PHASE_1_OUTPUT_DIM = 150
     DEP_EMB_DIM = 10
     TRANSITION_STEP = 6
 
