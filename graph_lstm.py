@@ -351,6 +351,8 @@ class GraphLSTM(tf.keras.Model):
         self.h_calculator = HCalculator()
         self.state_transition = CustomizeLSTMCell()
         self.score_layer = ScoreLayer()
+        self.drop_out_rate = 0.2
+        self.drop_out_layer = Dropout(self.drop_out_rate)
 
     def emb_single(self, doc):
         """ Returns embedding for one sentence
@@ -371,8 +373,8 @@ class GraphLSTM(tf.keras.Model):
         es = self.char_emb(tokens)
         cs = self.elmo_emb(list([tokens]))
         concatenated = tf.concat([es, cs, ps], 1)
-
-        return concatenated
+        
+        return self.drop_out_layer(concatenated)
 
     def call(self, input_dict):
         """
@@ -405,8 +407,8 @@ class GraphLSTM(tf.keras.Model):
             h_history.append(h)
             c_history.append(c)
             break
-
-        output = self.score_layer(h_history[-1], input_dict)
+        node_hidden = self.drop_out_layer(h_history[-1])
+        output = self.score_layer(node_hidden, input_dict)
         return output
         return
 
