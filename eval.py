@@ -45,7 +45,7 @@ if __name__ == "__main__":
 
         y_dev = make_golden(x_dev)
 
-        logits = model(x_dev)
+        logits = model(x_dev, training=False)
         logits = make_tensor_from_dict(logits)
 
         all_pred += [int(tf.math.argmax(logit[0])) for logit in logits]
