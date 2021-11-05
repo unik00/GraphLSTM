@@ -44,7 +44,7 @@ if __name__ == "__main__":
     if train_args.from_pretrained:
         model.load_weights("saved_weights/saved")
 
-    optimizer = tf.keras.optimizers.Adadelta(learning_rate=0.1)
+    optimizer = tf.keras.optimizers.Adadelta(learning_rate=1.)
     loss_fn = tf.keras.losses.categorical_crossentropy
 
     start_time = time.time()
@@ -65,7 +65,7 @@ if __name__ == "__main__":
             y_train = make_golden(x_train)
 
             with tf.GradientTape() as tape:
-                logits = model(x_train)  # Logits for this minibatch
+                logits = model(x_train, training=True)  # Logits for this minibatch
                 logits = make_tensor_from_dict(logits)
 
                 # print("logits: ", logits, y_train)
