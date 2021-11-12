@@ -21,7 +21,7 @@ class CNNCharEmbedding(Layer):
 
         self.char_dict = char_dict
 
-        self.chars_emb = Embedding(len(self.char_dict) + 1,
+        self.chars_emb = Embedding(len(self.char_dict) + 2,
                                    self.CHAR_DIM,
                                    input_length=self.PADDED_LENGTH,
                                    embeddings_initializer=tf.keras.initializers.RandomNormal(mean=0., stddev=1.))
@@ -36,7 +36,10 @@ class CNNCharEmbedding(Layer):
         ret = list()
         word = normalize(word)
         for c in word:
-            ret.append(self.char_dict[c])
+            if c in self.char_dict:
+                ret.append(self.char_dict[c])
+            else:
+                ret.append(len(self.char_dict) + 1)
         return ret
 
     def pad(self, emb_chars: List[int]):
