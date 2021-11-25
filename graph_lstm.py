@@ -333,8 +333,10 @@ class GraphLSTM(tf.keras.Model):
     BI_LSTM_PHASE_1_OUTPUT_DIM = 150
     DEP_EMB_DIM = 10
     TRANSITION_STEP = 6
+    NER_HIDDEN_LAYER_SIZE = 100
+    NER_OUTPUT_LAYER_SIZE = 5
 
-    def __init__(self, dataset):
+    def __init__(self, dataset, use_ner = True):
         super().__init__()
 
         # embeddings
@@ -349,13 +351,17 @@ class GraphLSTM(tf.keras.Model):
                                            return_state=False))
 
         self.graph_builder = AdjListBuilder()
-
+        
         self.s_calculator = SCalculator()
         self.h_calculator = HCalculator()
         self.state_transition = CustomizeLSTMCell()
         self.score_layer = ScoreLayer()
         self.drop_out_rate = 0.2
         self.drop_out_layer = Dropout(self.drop_out_rate)
+        self.use_ner = use_ner
+        if use_ner:
+            self.ner_hidden_layer = Dense(self.NER_HIDDEN_LAYER_SIZE, activation="tanh")
+            self.ner_output_layer = Dense(self.NER_OUTPUT_LAYER_SIZE, activation="softmax")
 
     def emb_single(self, doc):
         """ Returns embedding for one sentence
@@ -399,6 +405,10 @@ class GraphLSTM(tf.keras.Model):
         bi_lstm_output = tf.identity(emb)
         bi_lstm_output = tf.reshape(bi_lstm_output, (bi_lstm_output.shape[1], bi_lstm_output.shape[2]))
         # print(bi_lstm_output.shape)
+        if self.use_ner:
+            ner_hidden = self.ner_hidden_layer(self.drop_out_layer(bi_lstm_output))
+            ner_output = self.ner_output_layer(ner_hidden)
+            
         s_in, s_out = self.s_calculator(adj_list, bi_lstm_output)
         initial_h = tf.constant(np.zeros((len(doc), CustomizeLSTMCell.TRANSITION_STATE_OUTPUTS_DIM)), dtype=tf.float32)
         initial_c = tf.constant(np.zeros((len(doc), CustomizeLSTMCell.TRANSITION_STATE_OUTPUTS_DIM)), dtype=tf.float32)
@@ -412,27 +422,27 @@ class GraphLSTM(tf.keras.Model):
             break
         node_hidden = self.drop_out_layer(h_history[-1])
         output = self.score_layer(node_hidden, input_dict)
+        if self.use_ner:
+            return output, ner_output
         return output
-        return
 
 
 if __name__ == "__main__":
-    # dataset = CDRData()
+    dataset = CDRData()
+    model = GraphLSTM(dataset)
 
-    # model = GraphLSTM(dataset)
+    train_data = dataset.build_data_from_file(dataset.DEV_DATA_PATH)
 
-    # train_data = dataset.build_data_from_file(dataset.DEV_DATA_PATH, mode='intra')
+    # '''
+    # for i in range(len(train_data)):
+    #     if len(train_data[i]['Chemical']) > 0 and len(train_data[i]['Disease']) > 0:
+    #         print(i)
+    #         print("output: ", model(train_data[i]))
+    #         break
+    # '''
 
-    '''
-    for i in range(len(train_data)):
-        if len(train_data[i]['Chemical']) > 0 and len(train_data[i]['Disease']) > 0:
-            print(i)
-            print("output: ", model(train_data[i]))
-            break
-    '''
-
-    e = Embedding(10,
-              100,
-              input_length=1)
-              #embeddings_initializer=tf.keras.initializers.RandomNormal(mean=0., stddev=1.))
-    print(e(0))
+    # e = Embedding(10,
+    #           100,
+    #           input_length=1)
+    #           #embeddings_initializer=tf.keras.initializers.RandomNormal(mean=0., stddev=1.))
+    # print(e(0))

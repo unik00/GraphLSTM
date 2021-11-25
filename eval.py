@@ -29,7 +29,7 @@ if __name__ == "__main__":
 
     model.load_weights("saved_weights/saved")
 
-    dev_data = dataset.build_data_from_file(data_path, mode='inter', limit=1000000000)
+    dev_data = dataset.build_data_from_file(data_path, limit=1000000000)
     random.shuffle(dev_data)
 
     all_pred = list()
