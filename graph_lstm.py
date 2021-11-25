@@ -336,7 +336,7 @@ class GraphLSTM(tf.keras.Model):
     NER_HIDDEN_LAYER_SIZE = 100
     NER_OUTPUT_LAYER_SIZE = 5
 
-    def __init__(self, dataset, use_ner = True):
+    def __init__(self, dataset, use_ner = False):
         super().__init__()
 
         # embeddings
