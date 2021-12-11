@@ -398,6 +398,7 @@ class GraphLSTM(tf.keras.Model):
 
         bi_lstm_output = tf.identity(emb)
         bi_lstm_output = tf.reshape(bi_lstm_output, (bi_lstm_output.shape[1], bi_lstm_output.shape[2]))
+        '''
         # print(bi_lstm_output.shape)
         s_in, s_out = self.s_calculator(adj_list, bi_lstm_output)
         initial_h = tf.constant(np.zeros((len(doc), CustomizeLSTMCell.TRANSITION_STATE_OUTPUTS_DIM)), dtype=tf.float32)
@@ -411,17 +412,19 @@ class GraphLSTM(tf.keras.Model):
             c_history.append(c)
             break
         node_hidden = self.drop_out_layer(h_history[-1])
+        '''
+        node_hidden = bi_lstm_output
         output = self.score_layer(node_hidden, input_dict)
         return output
         return
 
 
 if __name__ == "__main__":
-    # dataset = CDRData()
+    dataset = CDRData()
 
-    # model = GraphLSTM(dataset)
+    model = GraphLSTM(dataset)
 
-    # train_data = dataset.build_data_from_file(dataset.DEV_DATA_PATH, mode='intra')
+    train_data = dataset.build_data_from_file(dataset.DEV_DATA_PATH, mode='intra')
 
     '''
     for i in range(len(train_data)):
@@ -431,8 +434,4 @@ if __name__ == "__main__":
             break
     '''
 
-    e = Embedding(10,
-              100,
-              input_length=1)
-              #embeddings_initializer=tf.keras.initializers.RandomNormal(mean=0., stddev=1.))
-    print(e(0))
+    print(model(train_data[0]))
